@@ -110,7 +110,7 @@ def crawl(sites):
 
             # If for whatever reason the snapshot
             # failed, continue looping
-            if s == "hi":
+            if s == "{}":
                 continue
 
             # Extract the tree
