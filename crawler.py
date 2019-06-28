@@ -16,7 +16,7 @@ def crawl(sites):
         for site in sites.keys():
             # Use ZBrowse to get a snap
             # of the sites
-            s = SNAPS.snap(site)
+            s = SNAPS.snap(site, 100)
 
             # Extract the tree
             t = JREAD.get_tree(s)
