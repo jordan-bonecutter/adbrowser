@@ -93,7 +93,7 @@ def crawl(sites):
             # we can adjust the timeout value
             # accordingly
             start = TIME.time()
-            s     = "hi"#snap(site, t0)
+            s     = snap(site, t0)
             end   = TIME.time()
             tot   = end-start
             # If we timed out
@@ -106,11 +106,12 @@ def crawl(sites):
             # large values, it's better to not timeout
             # than to timeout)
             else:
-                t0 = ((((t0*t0)+((tot+1)*(tot+1)))/(t0+tot)))
+                t0 = (((t0*t0)+((tot+1)*(tot+1)))/(t0+tot))
 
             # If for whatever reason the snapshot
             # failed, continue looping
-            if s == "{}":
+            breakpoint()
+            if s == "{}" or s == None or s == "":
                 continue
 
             # Extract the tree
