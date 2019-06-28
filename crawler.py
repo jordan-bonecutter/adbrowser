@@ -110,7 +110,6 @@ def crawl(sites):
 
             # If for whatever reason the snapshot
             # failed, continue looping
-            breakpoint()
             if s == "{}" or s == None or s == "":
                 continue
 
