@@ -169,10 +169,9 @@ def get_levels(tree, curr, levels, maxw):
     return levels, maxw
 
 # build the dependency tree
-def get_tree(jso):
-    js = get_json(jso)
-
+def get_tree(js):
     # start at the root node
+    js   = json.loads(js)
     head = js['_root']
     tree = {}
     tree = tree_recurse(tree, head, "no")
