@@ -1,0 +1,17 @@
+
+<--- Last few GCs --->
+
+[5239:0x103800000]    38611 ms: Mark-sweep 570.4 (576.0) -> 570.4 (576.0) MB, 421.4 / 0.0 ms  allocation failure GC in old space requested
+[5239:0x103800000]    40126 ms: Mark-sweep 570.4 (576.0) -> 570.4 (575.0) MB, 1514.8 / 0.0 ms  last resort GC in old space requested
+[5239:0x103800000]    40530 ms: Mark-sweep 570.4 (575.0) -> 570.4 (574.5) MB, 404.1 / 0.0 ms  last resort GC in old space requested
+
+
+<--- JS stacktrace --->
+
+==== JS stack trace =========================================
+
+    0: ExitFrame [pc: 0xcaf9da8427d]
+Security context: 0x4ca3a0a0769 <JSObject>
+    1: /* anonymous */ [/Users/jordanbonecutter/Desktop/hpcforge/adbrowser/zbrowse/js/util/queue.js:~1] [pc=0xcaf9daf9a0c](this=0x4ca8abf3cc9 <Queue map = 0x4ca23651441>,b=0x4ca8abf3c91 <Node map = 0x4ca23651df1>)
+    2: /* anonymous */ [/Users/jordanbonecutter/Desktop/hpcforge/adbrowser/zbrowse/js/util/tree.js:~15] [pc=0xcaf9daf9d4e](this=0x4ca8abf3d49 <Tree ...
+
