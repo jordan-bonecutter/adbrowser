@@ -2,3 +2,4 @@
 *.ttf
 *.snp
 sites/*
+*.pyc
