@@ -11,9 +11,7 @@ def snap(url):
     PATH = "../zbrowse/js/index.js "
     EXEC = "node "
     PRFX = "http://www."
-    f = io.StringIO()
-    with redirect_stdout(f):
-        os.system(EXEC + PATH + PRFX + url + " > tmp.snp")
-        t = open("tmp.snp", "r").read()
-        os.system("rm -f tmp.snp")
+    os.system(EXEC + PATH + PRFX + url + " > tmp.snp")
+    t = open("tmp.snp", "r").read()
+    os.system("rm -f tmp.snp")
     return t
