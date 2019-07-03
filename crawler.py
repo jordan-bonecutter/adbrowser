@@ -15,7 +15,7 @@ magic_string = r"heap out of memory"
 REGEX        = None
 SUBP         = None
 
-hex_digits   = ['0','1','2','3','4','5','6','7','8','9','a', 'b','c','d','e','f']
+hex_digits   = ['0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f']
 
 def snap(url, timeout):
     global REGEX, magic_string
@@ -137,7 +137,7 @@ def crawl(sites):
 
             # Extract the tree
             t = JREAD.get_tree(s)
-            JREAD.draw_tree(t, "./sites/" + site + str(sites[site][0]) + ".png")
+            #JREAD.draw_tree(t, "./sites/" + site + str(sites[site][0]) + ".png")
 
             # Save it to a file
             print("Completed scraping " + site + " in " + str(tot) + " seconds")
