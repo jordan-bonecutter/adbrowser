@@ -15,55 +15,22 @@ magic_string = r"heap out of memory"
 REGEX        = None
 SUBP         = None
 
-RUN          = 0
+hex_digits   = ['0','1','2','3','4','5','6','7','8','9','a', 'b','c','d','e','f']
 
 def snap(url, timeout):
-    global REGEX, magic_string, RUN
+    global REGEX, magic_string
 
     # Clear browser cache
-    # I know, I know... this is really hideous
-    # This wouldn't work unless I cleared the files
-    # that start with a hex digit so this is the best
-    # got. TODO: make this better (?)
+    # Haha! That's a little better I guess...
+    # TODO: there is still a better way to do this...
     c_loc = "/Users/jordanbonecutter/Library/Caches/Google/Chrome\ Canary/Default/"
-    os.system("rm -rf " + c_loc + "Cache/0*") 
-    os.system("rm -rf " + c_loc + "Cache/1*") 
-    os.system("rm -rf " + c_loc + "Cache/2*") 
-    os.system("rm -rf " + c_loc + "Cache/3*") 
-    os.system("rm -rf " + c_loc + "Cache/4*") 
-    os.system("rm -rf " + c_loc + "Cache/5*") 
-    os.system("rm -rf " + c_loc + "Cache/6*") 
-    os.system("rm -rf " + c_loc + "Cache/7*") 
-    os.system("rm -rf " + c_loc + "Cache/8*") 
-    os.system("rm -rf " + c_loc + "Cache/9*") 
-    os.system("rm -rf " + c_loc + "Cache/a*") 
-    os.system("rm -rf " + c_loc + "Cache/b*") 
-    os.system("rm -rf " + c_loc + "Cache/c*") 
-    os.system("rm -rf " + c_loc + "Cache/d*") 
-    os.system("rm -rf " + c_loc + "Cache/e*") 
-    os.system("rm -rf " + c_loc + "Cache/f*") 
+    for digit in hex_digits:
+        os.system("rm -rf " + c_loc + "Cache/" + digit + "*")
+        os.system("rm -rf " + c_loc + "Code Cache/js/" + digit + "*")
     os.system("rm -rf " + c_loc + "Cache/index")
     os.system("rm -rf " + c_loc + "Cache/index-dir/*")
-
-    os.system("rm -rf " + c_loc + "Code Cache/js/0*") 
-    os.system("rm -rf " + c_loc + "Code Cache/js/1*") 
-    os.system("rm -rf " + c_loc + "Code Cache/js/2*") 
-    os.system("rm -rf " + c_loc + "Code Cache/js/3*") 
-    os.system("rm -rf " + c_loc + "Code Cache/js/4*") 
-    os.system("rm -rf " + c_loc + "Code Cache/js/5*") 
-    os.system("rm -rf " + c_loc + "Code Cache/js/6*") 
-    os.system("rm -rf " + c_loc + "Code Cache/js/7*") 
-    os.system("rm -rf " + c_loc + "Code Cache/js/8*") 
-    os.system("rm -rf " + c_loc + "Code Cache/js/9*") 
-    os.system("rm -rf " + c_loc + "Code Cache/js/a*") 
-    os.system("rm -rf " + c_loc + "Code Cache/js/b*") 
-    os.system("rm -rf " + c_loc + "Code Cache/js/c*") 
-    os.system("rm -rf " + c_loc + "Code Cache/js/d*") 
-    os.system("rm -rf " + c_loc + "Code Cache/js/e*") 
-    os.system("rm -rf " + c_loc + "Code Cache/js/f*") 
     os.system("rm -rf " + c_loc + "Code Cache/js/index")
     os.system("rm -rf " + c_loc + "Code Cache/js/index-dir/*")
-
     os.system("rm -rf " + c_loc + "Storage/ext/*")
 
     # Path on my machine to the ZBrowse file
@@ -73,9 +40,8 @@ def snap(url, timeout):
     # Add the http prefix to the url
     PRFX = "https://www."
     # Redirect stdout to a file
-    new_sout = open("sout" + str(RUN) + ".snp", "w")
-    new_serr = open("serr" + str(RUN) + ".snp", "w")
-    RUN += 1
+    new_sout = open("sout.snp", "w")
+    new_serr = open("serr.snp", "w")
     extra    = "--max_old_space_size=4096"
     # Execute the node.js program
     SUBP = subprocess.Popen(args=(EXEC, extra, PATH, PRFX+url), stdout=new_sout, stderr=new_serr)
@@ -111,7 +77,7 @@ def snap(url, timeout):
             # Close it again
             r.close()
             # Remove it
-            # os.system("rm -r *.snp")
+            os.system("rm -r *.snp")
             SUBP = None
     except subprocess.TimeoutExpired:
         # If we timed out, kill the subproc
@@ -122,7 +88,7 @@ def snap(url, timeout):
         # Close redirected stdout
         new_sout.close()
         # Remove temp file
-        # os.system("rm -r *.snp")
+        os.system("rm -r *.snp")
         print("Timeout")
     return t
 
@@ -197,5 +163,5 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("Interrupted")
         if SUBP != None:
-            # os.system("rm -rf *.snp")
+            os.system("rm -rf *.snp")
             os.kill(SUBP.pid, signal.SIGTERM)

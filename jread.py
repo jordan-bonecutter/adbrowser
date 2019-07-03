@@ -85,9 +85,7 @@ def get_url(url):
 
 def draw_tree(tree, outname):
     # get the layout of the tree
-    structure = []
-    for i in range(0, len(tree)):
-        structure.append({})
+    structure = [{} for _ in range(len(tree))]
     i = 0
     for level in tree:
         j = 0
