@@ -15,8 +15,10 @@ magic_string = r"heap out of memory"
 REGEX        = None
 SUBP         = None
 
+RUN          = 0
+
 def snap(url, timeout):
-    global REGEX, magic_string
+    global REGEX, magic_string, RUN
 
     # Clear browser cache
     # I know, I know... this is really hideous
@@ -71,8 +73,9 @@ def snap(url, timeout):
     # Add the http prefix to the url
     PRFX = "https://www."
     # Redirect stdout to a file
-    new_sout = open("sout.snp", "w")
-    new_serr = open("serr.snp", "w")
+    new_sout = open("sout" + str(RUN) + ".snp", "w")
+    new_serr = open("serr" + str(RUN) + ".snp", "w")
+    RUN += 1
     extra    = "--max_old_space_size=4096"
     # Execute the node.js program
     SUBP = subprocess.Popen(args=(EXEC, extra, PATH, PRFX+url), stdout=new_sout, stderr=new_serr)
@@ -108,7 +111,7 @@ def snap(url, timeout):
             # Close it again
             r.close()
             # Remove it
-            os.system("rm -r *.snp")
+            # os.system("rm -r *.snp")
             SUBP = None
     except subprocess.TimeoutExpired:
         # If we timed out, kill the subproc
@@ -119,7 +122,7 @@ def snap(url, timeout):
         # Close redirected stdout
         new_sout.close()
         # Remove temp file
-        os.system("rm -r *.snp")
+        # os.system("rm -r *.snp")
         print("Timeout")
     return t
 
@@ -179,6 +182,12 @@ def crawl(sites):
 
 def main():
     SITES = {"yahoo.com": [0,45], "forbes.com":[0,45], "bbc.com":[0,45], "cnn.com":[0,45]}
+    SITES.update({"huffingtonpost.com":[0,45]})
+    SITES.update({"nytimes.com":[0,45]})
+    SITES.update({"foxnews.com":[0,45]})
+    SITES.update({"nbc.com":[0,45]})
+    SITES.update({"washingtonpost.com":[0,45]})
+    SITES.update({"theguardian.com":[0,45]})
     crawl(SITES)
 
 # main function call
@@ -188,5 +197,5 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("Interrupted")
         if SUBP != None:
-            os.system("rm -rf *.snp")
+            # os.system("rm -rf *.snp")
             os.kill(SUBP.pid, signal.SIGTERM)

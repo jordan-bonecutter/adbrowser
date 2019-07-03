@@ -230,7 +230,7 @@ def get_tree(s):
                 if p_url in tree[p_lyr+1][c_url]:
                     tree[p_lyr+1][c_url][p_url] += 1
                 else:
-                    tree[p_lyr+1][c_url].append(p_url)
+                    tree[p_lyr+1][c_url].update({p_url:1})
             else:
                 tree[p_lyr+1].update({c_url:{p_url:1}})
 
