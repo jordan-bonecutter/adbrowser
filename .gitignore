@@ -3,4 +3,5 @@
 *.snp
 sites/*
 res/*
+sites.json
 *.pyc

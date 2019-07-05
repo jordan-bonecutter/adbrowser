@@ -98,7 +98,7 @@ def snap(url, timeout, clear_cache):
         print("Timeout")
     return t
 
-def crawl(sites, save_image):
+def crawl(sites, save_image, restore):
     global RESULTS
 
     # local variables
@@ -107,15 +107,20 @@ def crawl(sites, save_image):
     start = 0
     end   = 0
     tot   = 0
-    RESULTS = {}
+    if restore != None:
+        with open(restore, 'r') as fi:
+            RESULTS = JSON.loads(fi.read())
+    else:
+        RESULTS = {}
     for site in sites:
-        RESULTS.update({site:{'info':{}, 'timer':45}})
+        if site not in RESULTS:
+            RESULTS.update({site:{'snapshots':{}, 'timer':45}})
 
     # Forever while loop
     while True:
         # Iterate through all sites in
         # the given list
-        for site in RESULTS.keys():
+        for site in sites:
             # Use ZBrowse to get a snap
             # of the sites
             #
@@ -150,17 +155,29 @@ def crawl(sites, save_image):
 
             # Extract the tree
             t = JREAD.get_tree(s)
-            r = {date: t}
-            RESULTS[site]['info'].update(r)
+            RESULTS[site]['snapshots'].update({"date": date, "tree": t, "tree_format": "backreferenced-1.0"})
             if save_image:
-                JREAD.draw_tree(t, "./sites/clrche" + site + str(len(RESULTS[site]['info'])) + ".png")
+                JREAD.draw_tree(t, "res/img/tree_" + site + str(len(RESULTS[site]['snapshots'])) + ".png")
 
             # Print Deets 
             print("Completed scraping " + site + " in " + str(tot) + " seconds")
 
 def main():
-    sites = ["yahoo.com", "forbes.com", "bbc.com", "cnn.com", "huffpost.com", "nytimes.com", "nbc.com", "washingtonpost.com", "theguardian.com"]
-    crawl(sites, True)
+    # Open the sites list json file
+    with open("sites.json", "r") as fi:
+        sites = JSON.loads(fi.read())
+    # If the res directory is not set up
+    if not os.path.isdir("res"):
+        print("Creating results directory: ./res/")
+        os.mkdir("res")
+    if not os.path.isdir("res/img"):
+        os.mkdir("res/img")
+
+    # Try to restore an old run
+    restore = None
+    if os.path.exists("res/crawl.json"):
+        restore = "res/crawl.json"
+    crawl(sites, True, restore)
 
 # main function call
 if __name__ == "__main__":
@@ -172,9 +189,6 @@ if __name__ == "__main__":
             os.system("rm -rf *.snp")
             os.kill(SUBP.pid, signal.SIGTERM)
         if RESULTS != None:
-            for result in RESULTS.keys():
-                if os.path.isfile('res/'+result+".json"):
-                    with open('res/'+result+'.json', 'r') as fi:
-                        RESULTS[result]['info'].update(JSON.loads(fi.read()))
-                with open('res/'+result+'.json', 'w') as fi:
-                    JSON.dump(RESULTS[result]['info'], fi)
+            # Save the results dictionary
+            with open('res/crawl.json', 'w') as fi:
+                JSON.dump(RESULTS, fi)
