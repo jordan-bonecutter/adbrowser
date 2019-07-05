@@ -7,6 +7,7 @@
 import json     as JSON
 import jread    as JREAD
 import time     as TIME
+import datetime as DTTM
 import os, io
 import subprocess
 import re
@@ -14,12 +15,11 @@ import re
 magic_string = r"heap out of memory"
 REGEX        = None
 SUBP         = None
+RESULTS      = None
 
 hex_digits   = ['0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f']
 
-def snap(url, timeout):
-    global REGEX, magic_string
-
+def _clear_cache():
     # Clear browser cache
     # Haha! That's a little better I guess...
     # TODO: there is still a better way to do this...
@@ -32,6 +32,12 @@ def snap(url, timeout):
     os.system("rm -rf " + c_loc + "Code Cache/js/index")
     os.system("rm -rf " + c_loc + "Code Cache/js/index-dir/*")
     os.system("rm -rf " + c_loc + "Storage/ext/*")
+
+def snap(url, timeout, clear_cache):
+    global REGEX, magic_string
+
+    if clear_cache:
+        _clear_cache()
 
     # Path on my machine to the ZBrowse file
     PATH = "../zbrowse/js/index.js"
@@ -92,28 +98,34 @@ def snap(url, timeout):
         print("Timeout")
     return t
 
-def crawl(sites):
+def crawl(sites, save_image):
+    global RESULTS
+
     # local variables
     t0    = 45
 
     start = 0
     end   = 0
     tot   = 0
+    RESULTS = {}
+    for site in sites:
+        RESULTS.update({site:{'info':{}, 'timer':45}})
 
     # Forever while loop
     while True:
         # Iterate through all sites in
         # the given list
-        for site in sites.keys():
+        for site in RESULTS.keys():
             # Use ZBrowse to get a snap
             # of the sites
             #
             # We will time the snap so that
             # we can adjust the timeout value
             # accordingly
-            t0    = sites[site][1]
+            t0    = RESULTS[site]['timer']
             start = TIME.time()
-            s     = snap(site, t0+5)
+            date  = str(DTTM.datetime.now())
+            s     = snap(site, t0+5, True)
             end   = TIME.time()
             tot   = end-start
             # If we timed out
@@ -128,33 +140,27 @@ def crawl(sites):
             else:
                 t0 = (((t0*t0)+((tot)*(tot)))/(t0+tot))
     
-            sites[site][1] = t0
+            RESULTS[site]['timer'] = t0
 
             # If for whatever reason the snapshot
             # failed, continue looping
             if s == "{}" or s == None or s == "":
+                print("Unknown error...")
                 continue
 
             # Extract the tree
             t = JREAD.get_tree(s)
-            #JREAD.draw_tree(t, "./sites/" + site + str(sites[site][0]) + ".png")
+            r = {date: t}
+            RESULTS[site]['info'].update(r)
+            if save_image:
+                JREAD.draw_tree(t, "./sites/clrche" + site + str(len(RESULTS[site]['info'])) + ".png")
 
-            # Save it to a file
+            # Print Deets 
             print("Completed scraping " + site + " in " + str(tot) + " seconds")
-            f = open("sites/" + site + "[" + str(sites[site][0]) + "].json", "w")
-            JSON.dump(t, f)
-            f.close()
-            sites[site][0] += 1
 
 def main():
-    SITES = {"yahoo.com": [0,45], "forbes.com":[0,45], "bbc.com":[0,45], "cnn.com":[0,45]}
-    SITES.update({"huffingtonpost.com":[0,45]})
-    SITES.update({"nytimes.com":[0,45]})
-    SITES.update({"foxnews.com":[0,45]})
-    SITES.update({"nbc.com":[0,45]})
-    SITES.update({"washingtonpost.com":[0,45]})
-    SITES.update({"theguardian.com":[0,45]})
-    crawl(SITES)
+    sites = ["yahoo.com", "forbes.com", "bbc.com", "cnn.com", "huffpost.com", "nytimes.com", "nbc.com", "washingtonpost.com", "theguardian.com"]
+    crawl(sites, True)
 
 # main function call
 if __name__ == "__main__":
@@ -165,3 +171,10 @@ if __name__ == "__main__":
         if SUBP != None:
             os.system("rm -rf *.snp")
             os.kill(SUBP.pid, signal.SIGTERM)
+        if RESULTS != None:
+            for result in RESULTS.keys():
+                if os.path.isfile('res/'+result+".json"):
+                    with open('res/'+result+'.json', 'r') as fi:
+                        RESULTS[result]['info'].update(JSON.loads(fi.read()))
+                with open('res/'+result+'.json', 'w') as fi:
+                    JSON.dump(RESULTS[result]['info'], fi)
