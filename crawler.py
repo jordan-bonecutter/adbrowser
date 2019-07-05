@@ -8,7 +8,8 @@ import json     as JSON
 import jread    as JREAD
 import time     as TIME
 import datetime as DTTM
-import os, io
+import getopt   as OPT
+import os, io, sys
 import subprocess
 import re
 
@@ -17,9 +18,15 @@ REGEX        = None
 SUBP         = None
 RESULTS      = None
 
-hex_digits   = ['0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f']
+OFNAME       = "res/crawl.json"
+QUIET        = False
+
+def qprint(s):
+    if not QUIET:
+        print(s)
 
 def _clear_cache():
+    hex_digits   = ['0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f']
     # Clear browser cache
     # Haha! That's a little better I guess...
     # TODO: there is still a better way to do this...
@@ -65,13 +72,12 @@ def snap(url, timeout, clear_cache):
         if REGEX == None:
             REGEX = re.compile(magic_string)
         em = REGEX.search(ec.read())
+        ec.close()
         # If there was an out of memory error
         if em != None:
-            # Close the error fd
-            ec.close()
             # Set the tree to empty
             t = "{}"
-            print("JS ran out of memory")
+            qprint("JS ran out of memory")
         # Otherwise if the run was succesful
         else:
             # Reopen it 
@@ -95,7 +101,7 @@ def snap(url, timeout, clear_cache):
         new_sout.close()
         # Remove temp file
         os.system("rm -r *.snp")
-        print("Timeout")
+        qprint("Timeout")
     return t
 
 def crawl(sites, save_image, restore):
@@ -150,7 +156,7 @@ def crawl(sites, save_image, restore):
             # If for whatever reason the snapshot
             # failed, continue looping
             if s == "{}" or s == None or s == "":
-                print("Unknown error...")
+                qprint("Unknown error...")
                 continue
 
             # Extract the tree
@@ -160,35 +166,75 @@ def crawl(sites, save_image, restore):
                 JREAD.draw_tree(t, "res/img/tree_" + site + str(len(RESULTS[site]['snapshots'])) + ".png")
 
             # Print Deets 
-            print("Completed scraping " + site + " in " + str(tot) + " seconds")
+            qprint("Completed scraping " + site + " in " + str(tot) + " seconds")
+    return 0
 
-def main():
+def main(argv):
+    global OFNAME, QUIET
+
+    # Get command line args:
+    # -i: import a previous crawl
+    # -o: export current crawl
+    # -l: import list file
+    # -q: toggle quiet mode (no qprint statements)
+    # -h: help
+
+    prev_crawl = ["res/crawl.json"]
+    list_name  = "sites.json"
+
+    breakpoint()
+    try: 
+        opts, args = OPT.getopt(argv, "qhi:o:l:", [])
+    except OPT.GetoptError:
+        qprint("usage: " + argv[0] + "-i <previous crawl> -o <export name> -l <url list>")
+        return 2
+    for opt, arg in opts:
+        if opt == '-h':
+            qprint("usage: " + argv[0] + "-i <previous crawl> -o <export name> -l <url list>")
+            qprint("also : -q (toggle quiet mode) -h (help)")
+            return 0
+        elif opt == '-i':
+            prev_crawl.insert(0, arg)
+        elif opt == '-o':
+            OFNAME = arg
+        elif opt == '-l':
+            list_name = arg
+        elif opt == '-q':
+            QUIET = not QUIET
+
     # Open the sites list json file
-    with open("sites.json", "r") as fi:
+    if not os.path.exists(list_name):
+        qprint("File " + list_name + "does not exist")
+        return 1
+    with open(list_name, "r") as fi:
         sites = JSON.loads(fi.read())
     # If the res directory is not set up
     if not os.path.isdir("res"):
-        print("Creating results directory: ./res/")
+        qprint("Creating results directory: ./res/")
         os.mkdir("res")
     if not os.path.isdir("res/img"):
         os.mkdir("res/img")
 
     # Try to restore an old run
     restore = None
-    if os.path.exists("res/crawl.json"):
-        restore = "res/crawl.json"
-    crawl(sites, True, restore)
+    for run in prev_crawl:
+        if os.path.exists(run):
+            restore = run
+            break
+    return crawl(sites, True, restore)
 
 # main function call
 if __name__ == "__main__":
     try:
-        main()
+        ret = main(sys.argv)
+        sys.exit(ret)
     except KeyboardInterrupt:
-        print("Interrupted")
+        qprint("Interrupted")
+        # Kill the subprocess
         if SUBP != None:
             os.system("rm -rf *.snp")
             os.kill(SUBP.pid, signal.SIGTERM)
+        # Save the results dictionary
         if RESULTS != None:
-            # Save the results dictionary
-            with open('res/crawl.json', 'w') as fi:
+            with open(OFNAME, 'w') as fi:
                 JSON.dump(RESULTS, fi)
