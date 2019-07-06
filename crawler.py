@@ -231,8 +231,8 @@ if __name__ == "__main__":
         qprint("Interrupted")
         # Kill the subprocess
         if SUBP != None:
-            os.system("rm -rf *.snp")
             os.kill(SUBP.pid, signal.SIGTERM)
+            os.system("rm -rf *.snp")
         # Save the results dictionary
         if RESULTS != None:
             with open(OFNAME, 'w') as fi:
