@@ -48,7 +48,7 @@ url_string  = r"(\w+\.\w{2,6})\/"
 # we will make a regex who captures the child url & the parent url
 # it will look for "c:" and then pature whatever comes before the \n
 # it will then look for "p:" and pature anything till newline or EOF
-tree_string = r"c:(.+)\np:(.+)(?:\n|$)"
+tree_string = r"c:(.+)\np:(.+)\nn:({.*})"
 
 # use the magic string and regex to 
 # isolate the important part of a 
@@ -85,9 +85,7 @@ def get_url(url):
 
 def draw_tree(tree, outname):
     # get the layout of the tree
-    structure = []
-    for i in range(0, len(tree)):
-        structure.append({})
+    structure = [{} for _ in range(len(tree))]
     i = 0
     for level in tree:
         j = 0
@@ -195,6 +193,11 @@ def get_tree(s):
     for match in matches:
         c_url = get_url(match[0])
         p_url = get_url(match[1])
+        j     = json.loads(match[2])
+        if 'requests' in j and 'requests' in j['requests']:
+            if 'headers' in j['requests']['requests']:
+                if 'Referer' in j['requests']['requests']['headers']:
+                    p_url = get_url(j['requests']['requests']['headers']['Referer'])
         # if the url is garbage or it is
         # a self redirect which we don't
         # really care about
