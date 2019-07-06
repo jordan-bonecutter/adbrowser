@@ -120,7 +120,7 @@ def crawl(sites, save_image, restore):
         RESULTS = {}
     for site in sites:
         if site not in RESULTS:
-            RESULTS.update({site:{'snapshots':{}, 'timer':45}})
+            RESULTS.update({site:{'snapshots':[], 'timer':45}})
 
     # Forever while loop
     while True:
@@ -161,7 +161,7 @@ def crawl(sites, save_image, restore):
 
             # Extract the tree
             t = JREAD.get_tree(s)
-            RESULTS[site]['snapshots'].update({"date": date, "tree": t, "tree_format": "backreferenced-1.0"})
+            RESULTS[site]['snapshots'].append({"date": date, "tree": t, "format": "backreferenced-1.0"})
             if save_image:
                 JREAD.draw_tree(t, "res/img/tree_" + site + str(len(RESULTS[site]['snapshots'])) + ".png")
 
@@ -182,7 +182,6 @@ def main(argv):
     prev_crawl = ["res/crawl.json"]
     list_name  = "sites.json"
 
-    breakpoint()
     try: 
         opts, args = OPT.getopt(argv, "qhi:o:l:", [])
     except OPT.GetoptError:
