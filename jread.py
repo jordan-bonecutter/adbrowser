@@ -8,37 +8,12 @@
 import json
 import re
 import PIL
+import tldextract
 from PIL import Image as IMG
 from PIL import ImageDraw as IMD
 from PIL import ImageFont as IMF
 
-URL_PARSER  = None
 TREE_PARSER = None
-
-# url regex string:
-# we want to find the "second level domain". to do so
-# we will read up until the top level domain and remeber
-# it and what came before it
-#
-# from the outside we have:\
-# ()\/
-# we see a capture group followed by a literal / charcter.
-# since we want to capture up until the first /, we should 
-# capture what is immediately before it. Inside the capture 
-# group we have:
-# \w+\.\w{2,6}
-# remember, we want to capture the second level domain so 
-# we will read up until the last dot that is followed by a 
-# forward slash (\w{2,6} means any word character string in 
-# length between 2 and 6. for www.google.com/ this would isolate
-# the "com" part)
-# It is surrounded in paranthesis to capture it. if we were to
-# run it on the following url:
-# https://doubleclickads.net/4fxj/l
-# we would get:
-# doubleclickads.net
-# url_string  = r"(\w+\.\w{2,6})\/"
-url_string = r"(\w+\.\w{2,6})(?:\/|:|^)"
 
 # tree regex string:
 # since the output from Zbrowse has been configured to be:
@@ -51,34 +26,13 @@ url_string = r"(\w+\.\w{2,6})(?:\/|:|^)"
 # it will then look for "p:" and pature anything till newline or EOF
 tree_string = r"c:(.+)\np:(.+)\nn:({.*})"
 
-# use the magic string and regex to 
-# isolate the important part of a 
-# domain name
 def get_url(url):
-    global URL_PARSER
-    # presumably we are going to call
-    # this function many times so compiling
-    # the regex will be faster
-    if URL_PARSER == None:
-        URL_PARSER = re.compile(url_string)
+    ext = tldextract.extract(url)
 
-    # catch the caller passing NULL
-    if url == None:
+    if ext.domain == None:
         return "nil"
-
-    # if we didn't find a url, for example:
-    # about:none
-    # appears many times, we should return a
-    # string letting the caller know that we
-    # didn't get a match
-    res = URL_PARSER.search(url)
-    if res == None:
-        print(url[:200])
-        return "nil"
-
-    # we should return the first 
-    # regex capture group
-    return res.group(1)
+    else:
+        return ext.domain
 
 def draw_tree(tree, outname):
     # get the layout of the tree
