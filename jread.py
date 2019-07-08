@@ -37,7 +37,8 @@ TREE_PARSER = None
 # https://doubleclickads.net/4fxj/l
 # we would get:
 # doubleclickads.net
-url_string  = r"(\w+\.\w{2,6})\/"
+# url_string  = r"(\w+\.\w{2,6})\/"
+url_string = r"(\w+\.\w{2,6})(?:\/|:|^)"
 
 # tree regex string:
 # since the output from Zbrowse has been configured to be:
@@ -61,11 +62,6 @@ def get_url(url):
     if URL_PARSER == None:
         URL_PARSER = re.compile(url_string)
 
-    # trim the string so the 
-    # regex takes faster
-    if len(url) > 40:
-        url = url[:40]
-
     # catch the caller passing NULL
     if url == None:
         return "nil"
@@ -77,6 +73,7 @@ def get_url(url):
     # didn't get a match
     res = URL_PARSER.search(url)
     if res == None:
+        print(url[:200])
         return "nil"
 
     # we should return the first 
@@ -137,6 +134,16 @@ def draw_tree(tree, outname):
         rng = slen*(2*rad) + (slen-1)*bufy
         c0y = ctr - (rng/2) + rad
         cy  = c0y + level*(2*rad + bufy)
+
+        # calculate number of unique parents
+        puni = {}
+        index = 0
+        for child in tree[level]:
+            for parent in tree[level][child]:
+                if parent not in puni:
+                    puni.update({parent: index})
+                    index += 1
+
         for item in structure[level].keys():
             # since we are iterating "horizontally", we
             # need only update the x position
@@ -160,9 +167,9 @@ def draw_tree(tree, outname):
                     cpy    = c0yp
                 
                     # get the width of the parent layer
-                    plsize = len(structure[level-1])
+                    plsize = len(puni)
                     # calculate on offset so that lines dont intersect
-                    offset = (pindex+1)*bufy/(plsize+2)
+                    offset = (puni[parent]+2)*bufy/(plsize+3)
                     # draw 3 lines to connect the parent and child
                     draw.line([(cx, cy-rad), (cx, cy-rad-offset-thck/2)], (0,0,0),thck)
                     draw.line([(cx, cy-rad-offset), (cpx, cy-rad-offset)], (0,0,0), thck)
@@ -187,55 +194,58 @@ def get_tree(s):
     
     # init an empty tree
     tree    = [{}]
+    netwd   = []
     matches = TREE_PARSER.findall(s)
     # iterate through the matches and 
     # bild the tree
     for match in matches:
         c_url = get_url(match[0])
         p_url = get_url(match[1])
+        r_url = "nil"
         j     = json.loads(match[2])
-        if 'requests' in j and 'requests' in j['requests']:
-            if 'headers' in j['requests']['requests']:
-                if 'Referer' in j['requests']['requests']['headers']:
-                    p_url = get_url(j['requests']['requests']['headers']['Referer'])
-        # if the url is garbage or it is
-        # a self redirect which we don't
-        # really care about
-        if c_url == "nil" or p_url == "nil" or c_url == p_url:
-            continue
-        p_lyr = tree_bfs(tree, p_url)
+        netwd.append(j)
+        if 'request' in j and 'request' in j['request']:
+            if 'headers' in j['request']['request']:
+                if 'Referer' in j['request']['request']['headers']:
+                    r_url = get_url(j['request']['request']['headers']['Referer'])
+        
+        tree = add_branch(tree, p_url, r_url)
+        tree = add_branch(tree, r_url, c_url)
+        
+    with open("test.json", "w") as fi:
+        json.dump(netwd, fi)
+    return tree
 
-        # if the parent is not in the tree
-        if p_lyr == -1:
-            # add it to the root
-            tree[0].update({p_url:{"_root":1}})
-            if len(tree) == 1:
-                tree.append({})
+def add_branch(tree, parent, child):
+    if parent == child or parent == "nil" or child == "nil":
+        return tree
 
-            # see if the child exists in 
-            # the next layer
-            if c_url in tree[1]:
-                if p_url in tree[1][c_url]:
-                    tree[1][c_url][p_url] += 1
-                else:
-                    tree[1][c_url].append(p_url)
-            else:
-                tree[1].update({c_url:{p_url:1}})
+    p_lyr = tree_bfs(tree, parent)
 
-        # if the parent is in the tree
-        else:
-            if len(tree) == p_lyr+1:
-                tree.append({})
-            
-            # see if the child exists in 
-            # the next layer
-            if c_url in tree[p_lyr+1]:
-                if p_url in tree[p_lyr+1][c_url]:
-                    tree[p_lyr+1][c_url][p_url] += 1
-                else:
-                    tree[p_lyr+1][c_url].update({p_url:1})
-            else:
-                tree[p_lyr+1].update({c_url:{p_url:1}})
+    # if the parent is not in the tree
+    if p_lyr == -1:
+        # put the parent at the root
+        tree[0].update({parent: {"_root": 1}})
+        p_lyr = 0
+        
+    # make sure the tree has enough layers
+    tree = tree + [{} for _ in range(len(tree), p_lyr+2)]
+
+    # if the child is not in the tree
+    if not child in tree[p_lyr+1]:
+        tree[p_lyr+1].update({child: {parent: 1}})
+
+    # if the child is in the tree and 
+    # the child doesn't contain a reference
+    # to the parent
+    elif not parent in tree[p_lyr+1][child]:
+        tree[p_lyr+1][child].update({parent: 1})
+
+    # if the child is in the tree and
+    # the child already contains a reference
+    # to the parent
+    else:
+        tree[p_lyr+1][child][parent] += 1
 
     return tree
 

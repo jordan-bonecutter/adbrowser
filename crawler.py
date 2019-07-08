@@ -142,7 +142,7 @@ def crawl(sites, save_image, restore):
             # If we timed out
             if tot >= t0:
                 # Double the timeout value
-                t0 *= 2
+                RESULTS[site]['timer'] *= 2
                 continue
             # If we didn't timeout, use a running
             # contraharmonic mean (chm to emphasize
@@ -232,7 +232,7 @@ if __name__ == "__main__":
         # Kill the subprocess
         if SUBP != None:
             os.kill(SUBP.pid, signal.SIGTERM)
-            os.system("rm -rf *.snp")
+        os.system("rm -rf *.snp")
         # Save the results dictionary
         if RESULTS != None:
             with open(OFNAME, 'w') as fi:
