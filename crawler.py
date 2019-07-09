@@ -9,7 +9,7 @@ import jread    as JREAD
 import time     as TIME
 import datetime as DTTM
 import getopt   as OPT
-import os, io, sys
+import os, sys
 import subprocess
 import re
 
