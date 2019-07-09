@@ -22,11 +22,12 @@ OFNAME       = "res/crawl.json"
 QUIET        = False
 
 def qprint(s):
+    # only print if quiet option is off
     if not QUIET:
         print(s)
 
 def _clear_cache():
-    hex_digits   = ['0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f']
+    hex_digits   = ["0","1","2","3","4","5","6","7","8","9","a","b","c","d","e","f"]
     # Clear browser cache
     # Haha! That's a little better I guess...
     # TODO: there is still a better way to do this...
@@ -39,6 +40,9 @@ def _clear_cache():
     os.system("rm -rf " + c_loc + "Code Cache/js/index")
     os.system("rm -rf " + c_loc + "Code Cache/js/index-dir/*")
     os.system("rm -rf " + c_loc + "Storage/ext/*")
+    c_loc = "/Users/jordanbonecutter/Library/Application\ Support/Google/Chrome\ Canary/"
+    os.system("rm -rf " + c_loc + "Default/GPUCache/*")
+    os.system("rm -rf " + c_loc + "ShaderCache/GPUCache/*")
 
 def snap(url, timeout, clear_cache):
     global REGEX, magic_string
@@ -108,19 +112,21 @@ def crawl(sites, save_image, restore):
     global RESULTS
 
     # local variables
-    t0    = 45
-
     start = 0
     end   = 0
     tot   = 0
+
+    # try to open a restore file
     if restore != None:
-        with open(restore, 'r') as fi:
+        with open(restore, "r") as fi:
             RESULTS = JSON.loads(fi.read())
+    # if there is no restore file
+    # then create a new data structure
     else:
         RESULTS = {}
     for site in sites:
         if site not in RESULTS:
-            RESULTS.update({site:{'snapshots':[], 'timer':45}})
+            RESULTS.update({site:{"snapshots":[], "timer":45}})
 
     # Forever while loop
     while True:
@@ -133,7 +139,7 @@ def crawl(sites, save_image, restore):
             # We will time the snap so that
             # we can adjust the timeout value
             # accordingly
-            t0    = RESULTS[site]['timer']
+            t0    = RESULTS[site]["timer"]
             start = TIME.time()
             date  = str(DTTM.datetime.now())
             s     = snap(site, t0+5, True)
@@ -142,7 +148,7 @@ def crawl(sites, save_image, restore):
             # If we timed out
             if tot >= t0:
                 # Double the timeout value
-                RESULTS[site]['timer'] *= 2
+                RESULTS[site]["timer"] *= 2
                 continue
             # If we didn't timeout, use a running
             # contraharmonic mean (chm to emphasize
@@ -151,7 +157,7 @@ def crawl(sites, save_image, restore):
             else:
                 t0 = (((t0*t0)+((tot)*(tot)))/(t0+tot))
     
-            RESULTS[site]['timer'] = t0
+            RESULTS[site]["timer"] = t0
 
             # If for whatever reason the snapshot
             # failed, continue looping
@@ -161,9 +167,9 @@ def crawl(sites, save_image, restore):
 
             # Extract the tree
             t = JREAD.get_tree(s)
-            RESULTS[site]['snapshots'].append({"date": date, "tree": t, "format": "backreferenced-1.0"})
+            RESULTS[site]["snapshots"].append({"date": date, "tree": t, "format": "backreferenced-1.0"})
             if save_image:
-                JREAD.draw_tree(t, "res/img/tree_" + site + str(len(RESULTS[site]['snapshots'])) + ".png")
+                JREAD.draw_tree(t, "res/img/tree_" + site + str(len(RESULTS[site]["snapshots"])) + ".png")
 
             # Print Deets 
             qprint("Completed scraping " + site + " in " + str(tot) + " seconds")
@@ -188,17 +194,17 @@ def main(argv):
         qprint("usage: " + argv[0] + "-i <previous crawl> -o <export name> -l <url list>")
         return 2
     for opt, arg in opts:
-        if opt == '-h':
+        if opt == "-h":
             qprint("usage: " + argv[0] + "-i <previous crawl> -o <export name> -l <url list>")
             qprint("also : -q (toggle quiet mode) -h (help)")
             return 0
-        elif opt == '-i':
+        elif opt == "-i":
             prev_crawl.insert(0, arg)
-        elif opt == '-o':
+        elif opt == "-o":
             OFNAME = arg
-        elif opt == '-l':
+        elif opt == "-l":
             list_name = arg
-        elif opt == '-q':
+        elif opt == "-q":
             QUIET = not QUIET
 
     # Open the sites list json file
@@ -235,5 +241,5 @@ if __name__ == "__main__":
         os.system("rm -rf *.snp")
         # Save the results dictionary
         if RESULTS != None:
-            with open(OFNAME, 'w') as fi:
+            with open(OFNAME, "w") as fi:
                 JSON.dump(RESULTS, fi)

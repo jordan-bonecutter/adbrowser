@@ -27,12 +27,14 @@ TREE_PARSER = None
 tree_string = r"c:(.+)\np:(.+)\nn:({.*})"
 
 def get_url(url):
+    # use tldextract to get the domain
     ext = tldextract.extract(url)
 
-    if ext.domain == None:
+    # if it couldn't find anything
+    if ext.domain == "" or exit.suffix == "":
         return "nil"
     else:
-        return ext.domain
+        return ".".join(exit.domain, ext.suffix)
 
 def draw_tree(tree, outname):
     # get the layout of the tree
@@ -148,7 +150,6 @@ def get_tree(s):
     
     # init an empty tree
     tree    = [{}]
-    netwd   = []
     matches = TREE_PARSER.findall(s)
     # iterate through the matches and 
     # bild the tree
@@ -157,17 +158,14 @@ def get_tree(s):
         p_url = get_url(match[1])
         r_url = "nil"
         j     = json.loads(match[2])
-        netwd.append(j)
-        if 'request' in j and 'request' in j['request']:
-            if 'headers' in j['request']['request']:
-                if 'Referer' in j['request']['request']['headers']:
-                    r_url = get_url(j['request']['request']['headers']['Referer'])
+        if "request" in j and "request" in j["request"]:
+            if "headers" in j["request"]["request"]:
+                if "Referer" in j["request"]["request"]["headers"]:
+                    r_url = get_url(j["request"]["request"]["headers"]["Referer"])
         
         tree = add_branch(tree, p_url, r_url)
         tree = add_branch(tree, r_url, c_url)
         
-    with open("test.json", "w") as fi:
-        json.dump(netwd, fi)
     return tree
 
 def add_branch(tree, parent, child):
