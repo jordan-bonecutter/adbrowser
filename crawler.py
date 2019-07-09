@@ -8,7 +8,7 @@ import json     as JSON
 import jread    as JREAD
 import time     as TIME
 import datetime as DTTM
-import getopt   as OPT
+import argparse as ARG
 import os, sys
 import subprocess
 import re
@@ -184,28 +184,36 @@ def main(argv):
     # -l: import list file
     # -q: toggle quiet mode (no qprint statements)
     # -h: help
-
     prev_crawl = ["res/crawl.json"]
     list_name  = "sites.json"
+    args       = "i:o:l:qh"
+    res        = ARG.parse(args, argv)
 
-    try: 
-        opts, args = OPT.getopt(argv, "qhi:o:l:", [])
-    except OPT.GetoptError:
-        qprint("usage: " + argv[0] + "-i <previous crawl> -o <export name> -l <url list>")
-        return 2
-    for opt, arg in opts:
-        if opt == "-h":
+    for flag, arg in res:
+        if flag == "-i":
+            if arg == None:
+                qprint("option: \"-i\" requries an argument")
+                return 1
+            else:
+                prev_crawl.insert(0, arg)
+        elif flag == "-o":
+            if arg == None:
+                qprint("option: \"-o\" requries an argument")
+                return 1
+            else:
+                OFNAME = arg
+        elif flag == "-l":
+            if arg == None:
+                qprint("option: \"-l\" requries an argument")
+                return 1
+            else:
+                list_name = arg
+        elif flag == "-q":
+            QUIET = not QUIET
+        elif flag == "-h":
             qprint("usage: " + argv[0] + "-i <previous crawl> -o <export name> -l <url list>")
             qprint("also : -q (toggle quiet mode) -h (help)")
             return 0
-        elif opt == "-i":
-            prev_crawl.insert(0, arg)
-        elif opt == "-o":
-            OFNAME = arg
-        elif opt == "-l":
-            list_name = arg
-        elif opt == "-q":
-            QUIET = not QUIET
 
     # Open the sites list json file
     if not os.path.exists(list_name):

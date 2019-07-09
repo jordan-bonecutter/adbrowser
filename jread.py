@@ -31,10 +31,10 @@ def get_url(url):
     ext = tldextract.extract(url)
 
     # if it couldn't find anything
-    if ext.domain == "" or exit.suffix == "":
+    if ext.domain == "" or ext.suffix == "":
         return "nil"
     else:
-        return ".".join(exit.domain, ext.suffix)
+        return ".".join((ext.domain, ext.suffix))
 
 def draw_tree(tree, outname):
     # get the layout of the tree
