@@ -213,7 +213,7 @@ def get_vtscore(url):
 def add_branch(tree, parent, child, rules):
     p_url = parent[0]
     c_url = child[0]
-    if parent == child or parent == "nil" or child == "nil":
+    if p_url == c_url or p_url == "nil" or c_url == "nil":
         return tree
 
     p_lyr = tree_bfs(tree, p_url)
