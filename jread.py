@@ -19,7 +19,7 @@ TREE_PARSER = None
 RULES       = None
 RULES_FILE  = "easylist.json"
 VT_ATTR     = {"apk_file": "vt.key", "req_url": "https://www.virustotal.com/vtapi/v2/url/report"}
-FORMAT      = "backreferenced-1.1"
+FORMAT      = "backreferenced-1.2"
 
 # tree regex string:
 # since the output from Zbrowse has been configured to be:
@@ -36,6 +36,9 @@ def get_format():
     return FORMAT
 
 def get_url(url):
+    return url
+'''
+def get_url(url):
     # use tldextract to get the domain
     ext = tldextract.extract(url)
 
@@ -44,6 +47,7 @@ def get_url(url):
         return "nil"
     else:
         return ".".join((ext.domain, ext.suffix))
+'''
 
 def draw_tree(tree, outname):
     # get the layout of the tree
@@ -110,27 +114,33 @@ def draw_tree(tree, outname):
                     index += 1
 
         for item in structure[level].keys():
-            color = (50, 20, 255)
-            if tree[level][item]["ad"]:
+            if tree[level][item]["ad"] == "yes":
                 color = (255, 20, 50)
+            elif tree[level][item]["ad"] == "no":
+                color = (50, 20, 255)
+            else:
+                color = (255, 20, 200)
+
 
             # since we are iterating "horizontally", we
             # need only update the x position
             cx  = c0x + structure[level][item]*(2*rad + bufx)
             
             # draw ecntered text
-            sitesize = draw.textsize(item, font=fnt)
+            sitesize = draw.textsize(item[:25], font=fnt)
             vttxt    = str(tree[level][item]["vtscore"])
             vtssize  = draw.textsize(vttxt, font=fnt)
 
             # draw the circle + text
             draw.ellipse([cx-rad, cy-rad, cx+rad, cy+rad], color, color)
-            draw.text([cx-sitesize[0]/2, cy-sitesize[1]], item,  font=fnt, fill=(0,0,0))
+            draw.text([cx-sitesize[0]/2, cy-sitesize[1]], item[:25],  font=fnt, fill=(0,0,0))
             draw.text([cx-vtssize[0]/2 , cy+vtssize [1]], vttxt, font=fnt, fill=(0,0,0))
             
             # if we aren't at the top level then
             # draw a line connecting it to its parent(s)
             if plev != -1:
+                thisp    = 0
+                thisptot = len(tree[level][item]["parents"])
                 # iterate through parents
                 for parent in tree[level][item]["parents"].keys():
 
@@ -142,11 +152,16 @@ def draw_tree(tree, outname):
                     # get the width of the parent layer
                     plsize = len(puni)
                     # calculate on offset so that lines dont intersect
-                    offset = (puni[parent]+2)*bufy/(plsize+3)
+                    offy = (puni[parent]+2)*bufy/(plsize+3)
+                    ofrx = (thck*(thisptot-1)) + (2*thck*(thisptot-1)) 
+                    of0x = -ofrx/2
+                    offx = of0x + thisp*ofrx/thisptot
                     # draw 3 lines to connect the parent and child
-                    draw.line([(cx, cy-rad), (cx, cy-rad-offset-thck/2)], (0,0,0),thck)
-                    draw.line([(cx, cy-rad-offset), (cpx, cy-rad-offset)], (0,0,0), thck)
-                    draw.line([(cpx, cy-rad-offset+thck/2), (cpx, cpy+rad)], (0,0,0), thck)
+                    draw.line([(cx+offx, cy-rad), (cx+offx, cy-rad-offy-thck/2)], (0,0,0),thck)
+                    draw.line([(cx+offx, cy-rad-offy), (cpx, cy-rad-offy)], (0,0,0), thck)
+                    draw.line([(cpx, cy-rad-offy+thck/2), (cpx, cpy+rad)], (0,0,0), thck)
+
+                    thisp += 1
 
         # remember the parent level and center
         # of the circle at the beginning of the parent level
@@ -190,6 +205,13 @@ def get_tree(s):
         tree = add_branch(tree, (par, p_url), (res, r_url), RULES)
         tree = add_branch(tree, (res, r_url), (chi, c_url), RULES)
 
+    for level in range(1, len(tree)):
+        for child, info in tree[level].items():
+            if info["ad"] == "no":
+                for parent in info["parents"].keys():
+                    if tree[level-1][parent]["ad"] != "no":
+                        tree[level][child]["ad"] = "inherited"
+
     return tree
 
 def get_vtscore(url):
@@ -213,7 +235,11 @@ def get_vtscore(url):
 def add_branch(tree, parent, child, rules):
     p_url = parent[0]
     c_url = child[0]
+    '''
     if p_url == c_url or p_url == "nil" or c_url == "nil":
+        return tree
+    '''
+    if p_url == "nil" or c_url == "nil":
         return tree
 
     p_lyr = tree_bfs(tree, p_url)
@@ -221,7 +247,9 @@ def add_branch(tree, parent, child, rules):
     # if the parent is not in the tree
     if p_lyr == -1:
         # put the parent at the root
-        tree[0].update({p_url: {"parents": {"_root": 1}, "ad": False, "vtscore": 0}})
+        tree[0].update({p_url: {"parents": {"_root": 1}, "ad": "no", "vtscore": 0}})
+        if rules.should_block(parent[1]):
+            tree[0][p_url]["ad"] = "yes"
         p_lyr = 0
         
     # make sure the tree has enough layers
@@ -229,7 +257,7 @@ def add_branch(tree, parent, child, rules):
 
     # if the child is not in the tree
     if not child in tree[p_lyr+1]:
-        tree[p_lyr+1].update({c_url: {"parents": {p_url: 1}, "ad": False, "vtscore": 0}})
+        tree[p_lyr+1].update({c_url: {"parents": {p_url: 1}, "ad": "no", "vtscore": 0}})
 
     # if the child is in the tree and 
     # the child doesn't contain a reference
@@ -243,12 +271,9 @@ def add_branch(tree, parent, child, rules):
     else:
         tree[p_lyr+1][c_url]["parents"][p_url] += 1
 
-    if not tree[p_lyr+1][c_url]["ad"] and rules.should_block(child[1]):
-        tree[p_lyr+1][c_url]["ad"] = True
+    if tree[p_lyr+1][c_url]["ad"] == "no" and rules.should_block(child[1]):
+        tree[p_lyr+1][c_url]["ad"] = "yes"
 
-    if not tree[p_lyr][p_url]["ad"] and rules.should_block(parent[1]):
-        tree[p_lyr][p_url]["ad"] = True
-    
     return tree
 
 def tree_bfs(tree, item):

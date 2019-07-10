@@ -170,6 +170,7 @@ def crawl(sites, save_image, restore):
             RESULTS[site]["snapshots"].append({"date": date, "tree": t, "format": JREAD.get_format()})
             if save_image:
                 JREAD.draw_tree(t, "res/img/tree_" + site + str(len(RESULTS[site]["snapshots"])) + ".png")
+            print(len(t))
 
             # Print Deets 
             qprint("Completed scraping " + site + " in " + str(tot) + " seconds")
@@ -234,7 +235,7 @@ def main(argv):
         if os.path.exists(run):
             restore = run
             break
-    return crawl(sites, True, restore)
+    return crawl(sites, False, restore)
 
 # main function call
 if __name__ == "__main__":
