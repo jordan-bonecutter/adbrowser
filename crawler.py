@@ -167,7 +167,7 @@ def crawl(sites, save_image, restore):
 
             # Extract the tree
             t = JREAD.get_tree(s)
-            RESULTS[site]["snapshots"].append({"date": date, "tree": t, "format": "backreferenced-1.0"})
+            RESULTS[site]["snapshots"].append({"date": date, "tree": t, "format": JREAD.get_format()})
             if save_image:
                 JREAD.draw_tree(t, "res/img/tree_" + site + str(len(RESULTS[site]["snapshots"])) + ".png")
 

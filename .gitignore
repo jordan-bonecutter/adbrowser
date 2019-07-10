@@ -5,3 +5,4 @@ sites/*
 res/*
 sites.json
 *.pyc
+*.key
