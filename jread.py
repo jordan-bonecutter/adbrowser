@@ -10,6 +10,7 @@ import re
 import PIL
 import tldextract
 import requests
+import csv
 from adblockparser import AdblockRules as ABR
 from PIL           import Image        as IMG
 from PIL           import ImageDraw    as IMD
@@ -20,6 +21,8 @@ RULES       = None
 RULES_FILE  = "easylist.json"
 VT_ATTR     = {"apk_file": "vt.key", "req_url": "https://www.virustotal.com/vtapi/v2/url/report"}
 FORMAT      = "backreferenced-1.2"
+
+FILE        = "../../../lifestyle.bg.d.csv"
 
 # tree regex string:
 # since the output from Zbrowse has been configured to be:
@@ -34,6 +37,48 @@ tree_string = r"c:(.+)\np:(.+)\nn:({.*})"
 
 def get_format():
     return FORMAT
+
+def csv_2_zbrowse(fname):
+    s = ""
+    with open(fname, "r") as fi:
+        reader = csv.reader(fi)
+        i = 0
+        curr_lev = 0
+        prev_lev = 0
+        lastparent = []
+        for row in reader:
+            i += 1
+            if i == 1:
+                s += "c:"+row[3] + "\n"
+                s += "p:nil\n"
+                s += "n:{}\n"
+                curr_lev = 0
+                lastparent.append(row[3])
+                continue
+            prev_lev = curr_lev
+            curr_lev = int(row[2])
+            if curr_lev > prev_lev:
+                # child
+                if len(lastparent) < curr_lev+1:
+                    lastparent.append(row[3])
+                else:
+                    lastparent[curr_lev] = row[3]
+                s += "c:"+row[3] + "\n"
+                s += "p:"+lastparent[curr_lev-1] + "\n"
+                s += "n:{}\n"
+            elif curr_lev == prev_lev:
+                # child of prev parent
+                s += "c:"+row[3]+"\n"
+                s += "p:"+lastparent[curr_lev-1]+"\n"
+                s += "n:{}\n"
+                lastparent[curr_lev] = row[3]
+            else:
+                # going back to other level
+                s += "c:"+row[3]+"\n"
+                s += "p:"+lastparent[curr_lev-1]+"\n"
+                s += "n:{}\n"
+                lastparent[curr_lev] = row[3]
+    return s
 
 def get_url(url):
     return url
@@ -188,6 +233,7 @@ def get_tree(s):
     matches = TREE_PARSER.findall(s)
     # iterate through the matches and 
     # bild the tree
+    breakpoint()
     for match in matches:
         c_url = match[0]
         p_url = match[1]
@@ -202,8 +248,9 @@ def get_tree(s):
         res = get_url(r_url)
         chi = get_url(c_url)
 
-        tree = add_branch(tree, (par, p_url), (res, r_url), RULES)
-        tree = add_branch(tree, (res, r_url), (chi, c_url), RULES)
+        #tree = add_branch(tree, (par, p_url), (res, r_url), RULES)
+        #tree = add_branch(tree, (res, r_url), (chi, c_url), RULES)
+        tree = add_branch(tree, (par, p_url), (chi, c_url), RULES)
 
     for level in range(1, len(tree)):
         for child, info in tree[level].items():
