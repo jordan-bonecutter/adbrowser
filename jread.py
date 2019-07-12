@@ -39,15 +39,25 @@ def get_format():
     return FORMAT
 
 def csv_2_zbrowse(fname):
+    # start with an empty string
     s = ""
+
+    # open the specified file
     with open(fname, "r") as fi:
+        # read it
         reader = csv.reader(fi)
+
+        # local var
         i = 0
         curr_lev = 0
         prev_lev = 0
         lastparent = []
+
+        #iterate through the rows
         for row in reader:
             i += 1
+            # for the first row, we have no previous
+            # row so it's a special case
             if i == 1:
                 s += "c:"+row[3] + "\n"
                 s += "p:nil\n"
@@ -55,8 +65,12 @@ def csv_2_zbrowse(fname):
                 curr_lev = 0
                 lastparent.append(row[3])
                 continue
+            # update level pointers
             prev_lev = curr_lev
             curr_lev = int(row[2])
+
+            # if the curent level is greater than the
+            # previous level, it means this node is a child
             if curr_lev > prev_lev:
                 # child
                 if len(lastparent) < curr_lev+1:
@@ -66,12 +80,16 @@ def csv_2_zbrowse(fname):
                 s += "c:"+row[3] + "\n"
                 s += "p:"+lastparent[curr_lev-1] + "\n"
                 s += "n:{}\n"
+            # if the current level is at the same as 
+            # the previous node, it means that we are
+            # still adding to the node on the previous level
             elif curr_lev == prev_lev:
                 # child of prev parent
                 s += "c:"+row[3]+"\n"
                 s += "p:"+lastparent[curr_lev-1]+"\n"
                 s += "n:{}\n"
                 lastparent[curr_lev] = row[3]
+            # only other choice is that we are going up levels
             else:
                 # going back to other level
                 s += "c:"+row[3]+"\n"
@@ -81,9 +99,6 @@ def csv_2_zbrowse(fname):
     return s
 
 def get_url(url):
-    return url
-'''
-def get_url(url):
     # use tldextract to get the domain
     ext = tldextract.extract(url)
 
@@ -92,7 +107,6 @@ def get_url(url):
         return "nil"
     else:
         return ".".join((ext.domain, ext.suffix))
-'''
 
 def draw_tree(tree, outname):
     # get the layout of the tree
@@ -173,7 +187,7 @@ def draw_tree(tree, outname):
             
             # draw ecntered text
             sitesize = draw.textsize(item[:25], font=fnt)
-            vttxt    = str(tree[level][item]["vtscore"])
+            vttxt    = str(tree[level][item]["vt"])
             vtssize  = draw.textsize(vttxt, font=fnt)
 
             # draw the circle + text
@@ -229,11 +243,12 @@ def get_tree(s):
             RULES = ABR(json.loads(fi.read()))
 
     # init an empty tree
-    tree         = [{}]
+    tree    = [{}]
+    nodes   = []
+    index   = 0
     matches = TREE_PARSER.findall(s)
     # iterate through the matches and 
     # bild the tree
-    breakpoint()
     for match in matches:
         c_url = match[0]
         p_url = match[1]
@@ -244,22 +259,98 @@ def get_tree(s):
                 if "Referer" in j["request"]["request"]["headers"]:
                     r_url = j["request"]["request"]["headers"]["Referer"]
         
-        par = get_url(p_url)
-        res = get_url(r_url)
-        chi = get_url(c_url)
 
-        #tree = add_branch(tree, (par, p_url), (res, r_url), RULES)
-        #tree = add_branch(tree, (res, r_url), (chi, c_url), RULES)
-        tree = add_branch(tree, (par, p_url), (chi, c_url), RULES)
+        index = add_branch(tree, index, nodes, p_url, r_url)
+        index = add_branch(tree, index, nodes, r_url, c_url)
 
-    for level in range(1, len(tree)):
-        for child, info in tree[level].items():
+    ret = []
+    for l in range(0, len(tree)):
+        ret.append({})
+        for n in tree[l].keys():
+            nn = get_url(list(tree[l][n]["aliases"].keys())[0])
+            ret[l].update({nn: {"parents": {}, "ad": "no", "vt": 0}})
+            for alias in tree[l][n]["aliases"].keys():
+                if RULES.should_block(alias):
+                    ret[l][nn]["ad"] = "yes"
+                    break
+            if l == 0:
+                continue
+            for p in tree[l][n]["parents"].keys():
+                ret[l][nn]["parents"].update({get_url(nodes[p]): tree[l][n]["parents"][p]})
+
+    for level in range(1, len(ret)):
+        for child, info in ret[level].items():
             if info["ad"] == "no":
                 for parent in info["parents"].keys():
-                    if tree[level-1][parent]["ad"] != "no":
-                        tree[level][child]["ad"] = "inherited"
+                    if ret[level-1][parent]["ad"] != "no":
+                        ret[level][child]["ad"] = "inherited"
 
-    return tree
+    return ret
+
+def add_branch(tree, index, nodes, parent, child):
+    global RULES
+
+    c_url = get_url(child)
+    p_url = get_url(parent)
+    if p_url == "nil" or c_url == "nil":
+        return index
+
+    # find the parent node
+    pnode, layer = tree_search(tree, parent)
+
+    # if the parent isn't in the tree
+    if layer == -1:
+        layer = 0
+        pnode = index
+        tree[layer].update({pnode: {"aliases": {parent: 0}, "parents": {-1: 0}}})
+        nodes.append(parent)
+        index += 1
+    
+    # make sure there's enough room for 
+    # the child in the next layer
+    if len(tree) == layer+1:
+        tree.append({})
+
+    # see if the child exists in the next
+    # layer 
+    # cnode = sim_search(tree[layer+1], c_url)
+    cnode = -1
+
+    # if the child isn't in the next layer
+    if cnode == -1:
+        cnode = index
+        tree[layer+1].update({cnode: {"aliases": {child: 0}, "parents": {pnode: 1}}}) 
+        nodes.append(child)
+        index += 1
+
+    # if the child is in the next layer
+    else:
+        # add it to the aliases 
+        tree[layer+1][cnode]["aliases"].update({child: 0})
+        # if the parent is already in the parent dict
+        if pnode in tree[layer+1][cnode]["parents"]:
+            tree[layer+1][cnode]["parents"][pnode] += 1
+        # if the parent is not yet in the parent dict
+        else:
+            tree[layer+1][cnode]["parents"].update({pnode: 1})
+
+    return index
+
+def tree_search(tree, name):
+    for layer in range(0, len(tree)):
+        for node in tree[layer].keys():
+            for alias in tree[layer][node]["aliases"].keys():
+                if alias == name:
+                    return node, layer
+    return -1, -1
+
+def sim_search(layer, nickname):
+    for node in layer.keys():
+        for alias in layer[node]["aliases"].keys():
+            if get_url(alias) == nickname:
+                return node
+    return -1
+
 
 def get_vtscore(url):
     global VT_ATTR
@@ -278,57 +369,5 @@ def get_vtscore(url):
         return js["positives"]
     except (json.decoder.JSONDecodeError, KeyError):
         return 0
-
-def add_branch(tree, parent, child, rules):
-    p_url = parent[0]
-    c_url = child[0]
-    '''
-    if p_url == c_url or p_url == "nil" or c_url == "nil":
-        return tree
-    '''
-    if p_url == "nil" or c_url == "nil":
-        return tree
-
-    p_lyr = tree_bfs(tree, p_url)
-
-    # if the parent is not in the tree
-    if p_lyr == -1:
-        # put the parent at the root
-        tree[0].update({p_url: {"parents": {"_root": 1}, "ad": "no", "vtscore": 0}})
-        if rules.should_block(parent[1]):
-            tree[0][p_url]["ad"] = "yes"
-        p_lyr = 0
-        
-    # make sure the tree has enough layers
-    tree = tree + [{} for _ in range(len(tree), p_lyr+2)]
-
-    # if the child is not in the tree
-    if not child in tree[p_lyr+1]:
-        tree[p_lyr+1].update({c_url: {"parents": {p_url: 1}, "ad": "no", "vtscore": 0}})
-
-    # if the child is in the tree and 
-    # the child doesn't contain a reference
-    # to the parent
-    elif not parent in tree[p_lyr+1][c_url]["parents"]:
-        tree[p_lyr+1][c_url].update({p_url: 1})
-
-    # if the child is in the tree and
-    # the child already contains a reference
-    # to the parent
-    else:
-        tree[p_lyr+1][c_url]["parents"][p_url] += 1
-
-    if tree[p_lyr+1][c_url]["ad"] == "no" and rules.should_block(child[1]):
-        tree[p_lyr+1][c_url]["ad"] = "yes"
-
-    return tree
-
-def tree_bfs(tree, item):
-    # search "horizontally"
-    for i in range(0, len(tree)):
-        if item in tree[i]:
-            return i
-    # item is not in the tree
-    return -1
 
 # eof #
