@@ -7,14 +7,12 @@
 # imports
 import json
 import re
-import PIL
+import cairo
+import math
 import tldextract
 import requests
 import csv
 from adblockparser import AdblockRules as ABR
-from PIL           import Image        as IMG
-from PIL           import ImageDraw    as IMD
-from PIL           import ImageFont    as IMF
 
 TREE_PARSER = None
 RULES       = None
@@ -138,9 +136,11 @@ def draw_tree(tree, outname):
     size = (bufx + w*(bufx+(2*rad)), bufy + h*(bufy+(2*rad)))
 
     # create a new image
-    img  = IMG.new ("RGB", size, (255, 255, 255))
-    draw = IMD.Draw(img)
-    fnt  = IMF.truetype("Menlo-Regular.ttf", 50)
+    surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, size[0], size[1])
+    ctx     = cairo.Context     (surface)
+    ctx.set_source_rgba(1, 1, 1, 1)
+    ctx.rectange(0,0,size[0], size[1])
+    ctx.fill()
 
     # draw!
     plev = -1
@@ -186,14 +186,18 @@ def draw_tree(tree, outname):
             cx  = c0x + structure[level][item]*(2*rad + bufx)
             
             # draw ecntered text
-            sitesize = draw.textsize(item[:25], font=fnt)
+            sitesize = draw.textsize(get_url(item), font=fnt)
             vttxt    = str(tree[level][item]["vt"])
             vtssize  = draw.textsize(vttxt, font=fnt)
 
             # draw the circle + text
-            draw.ellipse([cx-rad, cy-rad, cx+rad, cy+rad], color, color)
-            draw.text([cx-sitesize[0]/2, cy-sitesize[1]], item[:25],  font=fnt, fill=(0,0,0))
-            draw.text([cx-vtssize[0]/2 , cy+vtssize [1]], vttxt, font=fnt, fill=(0,0,0))
+            #draw.ellipse([cx-rad, cy-rad, cx+rad, cy+rad], color, color)
+            #draw.text([cx-sitesize[0]/2, cy-sitesize[1]], get_url(item),  font=fnt, fill=(0,0,0))
+            #draw.text([cx-vtssize[0]/2 , cy+vtssize [1]], vttxt, font=fnt, fill=(0,0,0))
+            ctx.set_source_rgba(color[0], color[1], color[2], 1.0)
+            ctx.arc(cx, cy, rad, 0, 2*math.pi)
+            ctx.fill()
+            ctx.set_source_rgba(0, 0, 0, 1.0)
             
             # if we aren't at the top level then
             # draw a line connecting it to its parent(s)
@@ -244,8 +248,7 @@ def get_tree(s):
 
     # init an empty tree
     tree    = [{}]
-    nodes   = []
-    index   = 0
+    nodes   = {}
     matches = TREE_PARSER.findall(s)
     # iterate through the matches and 
     # bild the tree
@@ -260,97 +263,58 @@ def get_tree(s):
                     r_url = j["request"]["request"]["headers"]["Referer"]
         
 
-        index = add_branch(tree, index, nodes, p_url, r_url)
-        index = add_branch(tree, index, nodes, r_url, c_url)
+        add_branch(tree, nodes, p_url, r_url)
+        add_branch(tree, nodes, r_url, c_url)
 
-    ret = []
-    for l in range(0, len(tree)):
-        ret.append({})
+    for l in range(1, len(tree)):
         for n in tree[l].keys():
-            nn = get_url(list(tree[l][n]["aliases"].keys())[0])
-            ret[l].update({nn: {"parents": {}, "ad": "no", "vt": 0}})
-            for alias in tree[l][n]["aliases"].keys():
-                if RULES.should_block(alias):
-                    ret[l][nn]["ad"] = "yes"
-                    break
-            if l == 0:
+            if tree[l][n]["ad"] == "yes":
                 continue
             for p in tree[l][n]["parents"].keys():
-                ret[l][nn]["parents"].update({get_url(nodes[p]): tree[l][n]["parents"][p]})
+                if tree[l-1][p]["ad"] != "no":
+                    tree[l][n]["ad"] = "inherited"
+                    break
 
-    for level in range(1, len(ret)):
-        for child, info in ret[level].items():
-            if info["ad"] == "no":
-                for parent in info["parents"].keys():
-                    if ret[level-1][parent]["ad"] != "no":
-                        ret[level][child]["ad"] = "inherited"
+    return tree
 
-    return ret
-
-def add_branch(tree, index, nodes, parent, child):
+def add_branch(tree, nodes, parent, child):
     global RULES
 
     c_url = get_url(child)
     p_url = get_url(parent)
     if p_url == "nil" or c_url == "nil":
-        return index
+        return
 
-    # find the parent node
-    pnode, layer = tree_search(tree, parent)
-
-    # if the parent isn't in the tree
-    if layer == -1:
+    # search for parent
+    #
+    # if the parent is not in the tree
+    if not parent in nodes:
         layer = 0
-        pnode = index
-        tree[layer].update({pnode: {"aliases": {parent: 0}, "parents": {-1: 0}}})
-        nodes.append(parent)
-        index += 1
-    
-    # make sure there's enough room for 
-    # the child in the next layer
+        tree[0].update({parent: {"ad": "no", "vt": 0, "parents": {}}})
+        nodes.update({parent: 0})
+        if RULES.should_block(parent):
+            tree[0][parent]["ad"] = "yes"
+    # if the parent is in the tree
+    else:
+        layer = nodes[parent]
+
+    # make sure the tree is big enough
     if len(tree) == layer+1:
         tree.append({})
 
-    # see if the child exists in the next
-    # layer 
-    # cnode = sim_search(tree[layer+1], c_url)
-    cnode = -1
-
-    # if the child isn't in the next layer
-    if cnode == -1:
-        cnode = index
-        tree[layer+1].update({cnode: {"aliases": {child: 0}, "parents": {pnode: 1}}}) 
-        nodes.append(child)
-        index += 1
-
-    # if the child is in the next layer
-    else:
-        # add it to the aliases 
-        tree[layer+1][cnode]["aliases"].update({child: 0})
-        # if the parent is already in the parent dict
-        if pnode in tree[layer+1][cnode]["parents"]:
-            tree[layer+1][cnode]["parents"][pnode] += 1
-        # if the parent is not yet in the parent dict
+    # if the child is already in the tree
+    if child in tree[layer+1]:
+        if not parent in tree[layer+1][child]["parents"]:
+            tree[layer+1][child]["parents"].update({parent: 1})
         else:
-            tree[layer+1][cnode]["parents"].update({pnode: 1})
+            tree[layer+1][child]["parents"][parent] += 1
 
-    return index
-
-def tree_search(tree, name):
-    for layer in range(0, len(tree)):
-        for node in tree[layer].keys():
-            for alias in tree[layer][node]["aliases"].keys():
-                if alias == name:
-                    return node, layer
-    return -1, -1
-
-def sim_search(layer, nickname):
-    for node in layer.keys():
-        for alias in layer[node]["aliases"].keys():
-            if get_url(alias) == nickname:
-                return node
-    return -1
-
+    # if the child is not yet in the tree
+    else:
+        tree[layer+1].update({child: {"ad": "no", "vt": 0, "parents": {parent: 1}}})
+        nodes.update({child: layer+1})
+        if RULES.should_block(child):
+            tree[layer+1][child]["ad"] = "yes"
 
 def get_vtscore(url):
     global VT_ATTR

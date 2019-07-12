@@ -235,7 +235,7 @@ def main(argv):
         if os.path.exists(run):
             restore = run
             break
-    return crawl(sites, True, restore)
+    return crawl(sites, False, restore)
 
 # main function call
 if __name__ == "__main__":
