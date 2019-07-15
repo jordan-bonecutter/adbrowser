@@ -1,0 +1,7 @@
+{
+				"outfile"      : "res/crawl.json", 
+				"restore"      : "res/crawl.json", 
+				"sitesfile"    : "sites.json",
+				"zbrowse_path" : "../zbrowse2/js/index.js",
+				"chromium_path": "/Applications/chrome-mac/Chromium.app/Contents/MacOS/Chromium"
+}

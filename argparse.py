@@ -31,5 +31,7 @@ def parse(arg_str, argv):
             # if it doesn't require a subarg
             else:
                 res_list.append((argv[i], True))
+        else:
+            res_list.append(argv[i], None)
 
     return res_list
