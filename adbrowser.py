@@ -81,6 +81,8 @@ class Adbrowser:
                 if tot >= t0:
                     # Double the timeout value
                     self.results[site]["timer"] *= 2
+                    if should_print:
+                        print("Timeout at " + site)
                     continue
                 # If we didn't timeout, use a running
                 # contraharmonic mean (chm to emphasize
@@ -98,7 +100,7 @@ class Adbrowser:
                     continue
 
                 # Extract the tree
-                # tree = jread.get_tree(tree)
+                tree = jread.get_tree(tree)
                 self.results[site]["snapshots"].append({"date":date,"tree":tree,"format":jread.get_format()})
                 if save_image:
                     jread.draw_tree(t,"res/img/tree_"+site+str(len(self.results[site]["snapshots"]))+".png")

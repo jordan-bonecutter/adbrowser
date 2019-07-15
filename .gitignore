@@ -7,3 +7,4 @@ sites.json
 *.pyc
 *.key
 *.log
+*.pkl

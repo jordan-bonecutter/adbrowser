@@ -12,26 +12,17 @@ import math
 import tldextract
 import requests
 import csv
+import os
+import _pickle as pickle
 from adblockparser import AdblockRules as ABR
 
-TREE_PARSER = None
 RULES       = None
 RULES_FILE  = "easylist.json"
+RULES_PKL   = "pickles/rules.pkl"
 VT_ATTR     = {"apk_file": "vt.key", "req_url": "https://www.virustotal.com/vtapi/v2/url/report"}
 FORMAT      = "backreferenced-1.2"
 
 FILE        = "../../../lifestyle.bg.d.csv"
-
-# tree regex string:
-# since the output from Zbrowse has been configured to be:
-# c:<child_url>
-# p:<parent_url>
-# ...
-# 
-# we will make a regex who captures the child url & the parent url
-# it will look for "c:" and then pature whatever comes before the \n
-# it will then look for "p:" and pature anything till newline or EOF
-tree_string = r"c:(.+)\np:(.+)\nn:({.*})"
 
 def get_format():
     return FORMAT
@@ -97,6 +88,9 @@ def csv_2_zbrowse(fname):
     return s
 
 def get_url(url):
+    if url == None:
+        return "nil"
+
     # use tldextract to get the domain
     ext = tldextract.extract(url)
 
@@ -127,20 +121,39 @@ def draw_tree(tree, outname):
             w = len(level)
 
     # picture parameters
-    rad  = 200
-    bufx = 100
-    bufy = 300
-    thck = 10
-
-    # get the image size
-    size = (bufx + w*(bufx+(2*rad)), bufy + h*(bufy+(2*rad)))
+    rad   = 200
+    bufx  = 100
+    bufy  = 300
+    thck  = 10
+    tsize = 50
+    tbuf  = 6
 
     # create a new image
-    surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, size[0], size[1])
-    ctx     = cairo.Context     (surface)
-    ctx.set_source_rgba(1, 1, 1, 1)
-    ctx.rectange(0,0,size[0], size[1])
+    while True:
+        try:
+            # get the image size
+            size = (int(bufx + w*(bufx+(2*rad))), int(bufy + h*(bufy+(2*rad))))
+            surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, size[0], size[1])
+            break
+        except cairo.Error:
+            rad   /= 2
+            bufx  /= 2
+            bufy  /= 2
+            thck  /= 2
+            tsize /= 2
+            tbuf  /= 2
+
+    ctx     = cairo.Context(surface)
+    ctx.set_source_rgb(1, 1, 1)
+    ctx.rectangle(0,0,size[0], size[1])
     ctx.fill()
+    fnt = cairo.ToyFontFace("Menlo", cairo.FontSlant.NORMAL, cairo.FontWeight.NORMAL)
+    opt = cairo.FontOptions()
+    fnt = cairo.ScaledFont(fnt, cairo.Matrix(tsize, 0, 0, tsize, 0, 0), cairo.Matrix(1, 0, 0, 1, 0, 0), opt)
+    ctx.set_scaled_font(fnt)
+    ctx.set_line_cap (cairo.LineCap.BUTT)
+    ctx.set_line_join(cairo.LineJoin.ROUND)
+    ctx.set_line_width(thck)
 
     # draw!
     plev = -1
@@ -174,11 +187,11 @@ def draw_tree(tree, outname):
 
         for item in structure[level].keys():
             if tree[level][item]["ad"] == "yes":
-                color = (255, 20, 50)
+                color = (255/255, 20/255, 50/255)
             elif tree[level][item]["ad"] == "no":
-                color = (50, 20, 255)
+                color = (50/255, 20/255, 255/255)
             else:
-                color = (255, 20, 200)
+                color = (255/255, 20/255, 200/255)
 
 
             # since we are iterating "horizontally", we
@@ -186,18 +199,22 @@ def draw_tree(tree, outname):
             cx  = c0x + structure[level][item]*(2*rad + bufx)
             
             # draw ecntered text
-            sitesize = draw.textsize(get_url(item), font=fnt)
             vttxt    = str(tree[level][item]["vt"])
-            vtssize  = draw.textsize(vttxt, font=fnt)
 
             # draw the circle + text
-            #draw.ellipse([cx-rad, cy-rad, cx+rad, cy+rad], color, color)
-            #draw.text([cx-sitesize[0]/2, cy-sitesize[1]], get_url(item),  font=fnt, fill=(0,0,0))
-            #draw.text([cx-vtssize[0]/2 , cy+vtssize [1]], vttxt, font=fnt, fill=(0,0,0))
-            ctx.set_source_rgba(color[0], color[1], color[2], 1.0)
+            ctx.set_source_rgb(color[0], color[1], color[2])
             ctx.arc(cx, cy, rad, 0, 2*math.pi)
             ctx.fill()
             ctx.set_source_rgba(0, 0, 0, 1.0)
+
+            ext = fnt.text_extents(get_url(item))
+            ctx.move_to(cx-ext.width/2, cy-tbuf)
+            ctx.show_text(get_url(item))
+
+            ext = fnt.text_extents(vttxt)
+            ctx.move_to(cx-ext.width/2, cy+ext.height + tbuf)
+            ctx.show_text(vttxt)
+            ctx.stroke()
             
             # if we aren't at the top level then
             # draw a line connecting it to its parent(s)
@@ -220,9 +237,11 @@ def draw_tree(tree, outname):
                     of0x = -ofrx/2
                     offx = of0x + thisp*ofrx/thisptot
                     # draw 3 lines to connect the parent and child
-                    draw.line([(cx+offx, cy-rad), (cx+offx, cy-rad-offy-thck/2)], (0,0,0),thck)
-                    draw.line([(cx+offx, cy-rad-offy), (cpx, cy-rad-offy)], (0,0,0), thck)
-                    draw.line([(cpx, cy-rad-offy+thck/2), (cpx, cpy+rad)], (0,0,0), thck)
+                    ctx.move_to(cx+offx, cy-rad)
+                    ctx.line_to(cx+offx, cy-rad-offy)
+                    ctx.line_to(cpx    , cy-rad-offy)
+                    ctx.line_to(cpx    , cpy+rad)
+                    ctx.stroke()
 
                     thisp += 1
 
@@ -232,39 +251,27 @@ def draw_tree(tree, outname):
         c0xp = c0x
         c0yp = cy
 
-    # delete the drawing object
-    del draw
     # save the image
-    img.save(outname, "PNG")
+    surface.write_to_png(outname)
 
-def get_tree(s):
+def get_tree(root):
     # save a regex for parsing the tree
-    global TREE_PARSER, RULES
-    if TREE_PARSER == None:
-        TREE_PARSER = re.compile(tree_string)
+    global RULES
     if RULES == None:
-        with open(RULES_FILE, "r") as fi:
-            RULES = ABR(json.loads(fi.read()))
+        if os.path.exists(RULES_PKL):
+            with open(RULES_PKL, "rb") as fi:
+                RULES = pickle.load(fi)
+        else:
+            with open(RULES_FILE, "r") as fi:
+                RULES = ABR(json.loads(fi.read()))
+            with open(RULES_PKL, "wb") as fi:
+                pickle.dump(RULES, fi, pickle.HIGHEST_PROTOCOL)
 
     # init an empty tree
     tree    = [{}]
     nodes   = {}
-    matches = TREE_PARSER.findall(s)
-    # iterate through the matches and 
-    # bild the tree
-    for match in matches:
-        c_url = match[0]
-        p_url = match[1]
-        r_url = "nil"
-        j     = json.loads(match[2])
-        if "request" in j and "request" in j["request"]:
-            if "headers" in j["request"]["request"]:
-                if "Referer" in j["request"]["request"]["headers"]:
-                    r_url = j["request"]["request"]["headers"]["Referer"]
-        
 
-        add_branch(tree, nodes, p_url, r_url)
-        add_branch(tree, nodes, r_url, c_url)
+    tree_traverse(tree, nodes, root["_root"])
 
     for l in range(1, len(tree)):
         for n in tree[l].keys():
@@ -276,6 +283,20 @@ def get_tree(s):
                     break
 
     return tree
+
+def tree_traverse(tree, nodes, root):
+    c_url = root["data"]
+    p_url = root["parent"]
+    try:
+        r_url = root["networkData"]["request"]["request"]["headers"]["Referer"]
+        add_branch(tree, nodes, p_url, r_url)
+        add_branch(tree, nodes, r_url, c_url)
+    except KeyError:
+        add_branch(tree, nodes, p_url, c_url)
+
+    if "children" in root:
+        for child in root["children"]:
+            tree_traverse(tree, nodes, child)
 
 def add_branch(tree, nodes, parent, child):
     global RULES
