@@ -41,7 +41,7 @@ class Adbrowser:
             js = json.loads(fi.read())
             return cls.fromdict(js)
 
-    def crawl(self, count, should_print):
+    def crawl(self, count, should_print, save_image):
         # local variables
         start = 0
         end   = 0
@@ -99,7 +99,7 @@ class Adbrowser:
 
                 # Extract the tree
                 # tree = jread.get_tree(tree)
-                self.results[site]["snapshots"].append({"date": date, "tree": t, "format": jread.get_format()})
+                self.results[site]["snapshots"].append({"date":date,"tree":tree,"format":jread.get_format()})
                 if save_image:
                     jread.draw_tree(t,"res/img/tree_"+site+str(len(self.results[site]["snapshots"]))+".png")
 

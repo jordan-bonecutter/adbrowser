@@ -8,6 +8,7 @@ import subprocess as sub
 import os
 import re
 import json
+import signal
 
 class ZBrowse:
     _chromium = None
@@ -36,18 +37,18 @@ class ZBrowse:
             self._ctrace = chrometrace_name
 
     def run(self, url, timeout):
-        self._chromium.start(timeout)
+        self._chromium.start(20)
 
         self._stdo = open(self.stdo_name, "w")
         self._stde = open(self.stde_name, "w")
-        zopts = ("node", self.path, url)
+        zopts = ("node", self.path, url, str(self.port))
         self.proc  = sub.Popen(args=zopts, stdout=self._stdo, stderr=self._stde)
 
         try:
             # Wait
             self.proc.wait(timeout)
             self.proc.kill()
-            self._chromium.kill(True, True, True)
+            self._chromium.kill(True, True)
             # Close the files so they save
             self._stdo.close()
             self._stde.close()
@@ -67,7 +68,8 @@ class ZBrowse:
                 # than closing & reopening a file
                 with open(self.stdo_name, "r") as stdout_fi:
                     # Read it
-                    tree = json.loads(stdout_fi.read())
+                    s = stdout_fi.read()
+                    tree = json.loads(s)
             # Remove it
             os.system("rm -f "+self.stdo_name)
             os.system("rm -f "+self.stde_name)
@@ -75,7 +77,7 @@ class ZBrowse:
         except sub.TimeoutExpired:
             # If we timed out, kill the subproc
             self.proc.kill()
-            self._chromium.kill(True, True, True)
+            self._chromium.kill(True, True)
             self.proc      = None
             # Return an empty dictionary
             tree = {}
@@ -107,7 +109,7 @@ class ZBrowse:
         return tree
 
     def stop(self):
-        self._chromium.kill(True, True, True)
+        self._chromium.kill(True, True)
         if self.proc:
             self.proc.kill()
             self._stdo.close()
@@ -153,9 +155,9 @@ class Chromium:
         self._serr = open(self._sest, "w")
         self.proc = sub.Popen(args=copts, stdout=self._sout, stderr=self._serr)
 
-    def kill(self, rm_sout, rm_serr, clr_cache):
-        if self.proc:
-            self.proc.kill()
+    def kill(self, rm_sout, rm_serr):
+        if self.proc != None:
+            os.kill(self.proc.pid, signal.SIGTERM)
             self._sout.close()
             self._serr.close()
         if rm_sout:

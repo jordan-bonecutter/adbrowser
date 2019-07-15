@@ -35,7 +35,7 @@ def main(argv):
                 return 1
 
         browse = adbrowser.Adbrowser.fromfile(restore_file)
-        browse.crawl(10000000, not quiet)
+        browse.crawl(10000000, not quiet, False)
         return 0
 
     except KeyboardInterrupt:
