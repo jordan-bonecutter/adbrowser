@@ -6,3 +6,4 @@ res/*
 sites.json
 *.pyc
 *.key
+*.log
