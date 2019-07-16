@@ -14,18 +14,13 @@ import requests
 import csv
 import os
 import _pickle as pickle
-from adblockparser import AdblockRules as ABR
+from adblockparser import AdblockRules
 
-RULES       = None
-RULES_FILE  = "easylist.json"
-RULES_PKL   = "pickles/rules.pkl"
-VT_ATTR     = {"apk_file": "vt.key", "req_url": "https://www.virustotal.com/vtapi/v2/url/report"}
-FORMAT      = "backreferenced-1.2"
-
-FILE        = "../../../lifestyle.bg.d.csv"
-
-def get_format():
-    return FORMAT
+_rules       = None
+_rules_file  = "easylist.json"
+_rules_pkl   = "pickles/rules.pkl"
+_vt_attr     = {"apk_file": "vt.key", "req_url": "https://www.virustotal.com/vtapi/v2/url/report"}
+node_version= "backreferenced-1.2"
 
 def csv_2_zbrowse(fname):
     # start with an empty string
@@ -256,16 +251,16 @@ def draw_tree(tree, outname):
 
 def get_tree(root):
     # save a regex for parsing the tree
-    global RULES
-    if RULES == None:
-        if os.path.exists(RULES_PKL):
-            with open(RULES_PKL, "rb") as fi:
-                RULES = pickle.load(fi)
+    global _rules
+    if _rules == None:
+        if os.path.exists(_rules_pkl):
+            with open(_rules_pkl, "rb") as fi:
+                _rules = pickle.load(fi)
         else:
-            with open(RULES_FILE, "r") as fi:
-                RULES = ABR(json.loads(fi.read()))
-            with open(RULES_PKL, "wb") as fi:
-                pickle.dump(RULES, fi, pickle.HIGHEST_PROTOCOL)
+            with open(_rules_file, "r") as fi:
+                _rules = AdblockRules(json.loads(fi.read()))
+            with open(_rules_pkl, "wb") as fi:
+                pickle.dump(_rules, fi, -1)
 
     # init an empty tree
     tree    = [{}]
@@ -299,7 +294,7 @@ def tree_traverse(tree, nodes, root):
             tree_traverse(tree, nodes, child)
 
 def add_branch(tree, nodes, parent, child):
-    global RULES
+    global _rules
 
     c_url = get_url(child)
     p_url = get_url(parent)
@@ -313,7 +308,7 @@ def add_branch(tree, nodes, parent, child):
         layer = 0
         tree[0].update({parent: {"ad": "no", "vt": 0, "parents": {}}})
         nodes.update({parent: 0})
-        if RULES.should_block(parent):
+        if _rules.should_block(parent):
             tree[0][parent]["ad"] = "yes"
     # if the parent is in the tree
     else:
@@ -334,21 +329,42 @@ def add_branch(tree, nodes, parent, child):
     else:
         tree[layer+1].update({child: {"ad": "no", "vt": 0, "parents": {parent: 1}}})
         nodes.update({child: layer+1})
-        if RULES.should_block(child):
+        if _rules.should_block(child):
             tree[layer+1][child]["ad"] = "yes"
 
+def trim_tree(tree):
+    trim  = [{}]
+    nodes = {}
+    names = []
+    index = 0
+    
+    trim[0].update({0: tree[0]})
+    nodes.update({list(tree[0].keys())[0]: index})
+    names.append(list(tree[0].keys())[0])
+    index += 1
+    # go through each level of the tree
+    for lev in tree[1:]:
+        # fo thru each url in that level
+        for url in lev.keys():
+            # if the url is not in the tree
+            if not url in nodes:
+                # then we need to add it
+                return 0
+    return 0
+                 
+
 def get_vtscore(url):
-    global VT_ATTR
+    global _vt_attr
 
-    if not "apk" in VT_ATTR:
-        with open(VT_ATTR["apk_file"], "r") as fi:
-            VT_ATTR.update({"apk": fi.read()})
-    if not "params" in VT_ATTR:
-        VT_ATTR.update({"params": {"apikey": VT_ATTR["apk"], "resource": None}})
+    if not "apk" in _vt_attr:
+        with open(_vt_attr["apk_file"], "r") as fi:
+            _vt_attr.update({"apk": fi.read()})
+    if not "params" in _vt_attr:
+        _vt_attr.update({"params": {"apikey": _vt_attr["apk"], "resource": None}})
 
-    VT_ATTR["params"]["resource"] = url
+    _vt_attr["params"]["resource"] = url
 
-    response = requests.get(VT_ATTR["req_url"], params=VT_ATTR["params"])
+    response = requests.get(_vt_attr["req_url"], params=_vt_attr["params"])
     try:
         js = response.json()
         return js["positives"]

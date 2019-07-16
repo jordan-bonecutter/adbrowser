@@ -9,6 +9,7 @@ import os
 import re
 import json
 import signal
+import _pickle as pickle
 
 class ZBrowse:
     _chromium = None
@@ -21,8 +22,8 @@ class ZBrowse:
     _stdo     = None
     _stde     = None
     _err_regx = None
-    _err_rstr = r"heap out of memory"
     _ctrace   = "res/traces.json"
+    pklpath   = "pickles/"
 
     def __init__(self, path, port, chromium_path, stdo_name, stde_name, chrometrace_name):
         self.path  = path
@@ -35,9 +36,16 @@ class ZBrowse:
             self.stde_name = stde_name
         if chrometrace_name != None:
             self._ctrace = chrometrace_name
+        if os.path.exists(self.pklpath+"zbrowse_err_regx.pkl"):
+            with open(self.pklpath+"zbrowse_err_regx.pkl", "rb") as fi:
+                self._err_regx = pickle.load(fi)
+        else:
+            self._err_regx = re.compile(r"heap out of memory")
+            with open(self.pklpath+"zbrowse_err_regx.pkl", "wb") as fi:
+                pickle.dump(self._err_regx, fi, -1)
 
     def run(self, url, timeout):
-        self._chromium.start(20)
+        self._chromium.start()
 
         self._stdo = open(self.stdo_name, "w")
         self._stde = open(self.stde_name, "w")
@@ -54,8 +62,6 @@ class ZBrowse:
             self._stde.close()
             # Check stderr for an error message
             with open(self.stde_name, "r") as stderr_fi:
-                if self._err_regx == None:
-                    self._err_regx = re.compile(self._err_rstr)
                 stderr_msg = self._err_regx.search(stderr_fi.read())
             # If there was an out of memory error
             if stderr_msg != None:
@@ -138,11 +144,8 @@ class Chromium:
         if cache_size != None:
             self._maxc = cache_size
 
-    def start(self, startup_timeout):
-        t0 = startup_timeout
-        if t0 == None:
-            t0 = 30
-        tst = "--trace-startup"
+    def start(self):
+        tst = "--trace-config-file"
         rdp = "--remote-debugging-port="+str(self.port)
         cc  = "--disk-cache-size="+str(self._maxc)
         gc  = "--disable-gpu-program-cache"
@@ -150,7 +153,7 @@ class Chromium:
         cd  = "--aggressive-cache-discard"
         sc  = "--disable-gpu-shader-disk-cache"
 
-        copts = (self.path, "--headless", tst, tst+"-duration="+str(t0), rdp, cc, gc, mc, cd, sc)
+        copts = (self.path, "--headless", tst, rdp, cc, gc, mc, cd, sc)
         self._sout = open(self._sost, "w")
         self._serr = open(self._sest, "w")
         self.proc = sub.Popen(args=copts, stdout=self._sout, stderr=self._serr)

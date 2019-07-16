@@ -101,9 +101,9 @@ class Adbrowser:
 
                 # Extract the tree
                 tree = jread.get_tree(tree)
-                self.results[site]["snapshots"].append({"date":date,"tree":tree,"format":jread.get_format()})
+                self.results[site]["snapshots"].append({"date":date,"tree":tree,"format":jread.node_version})
                 if save_image:
-                    jread.draw_tree(t,"res/img/tree_"+site+str(len(self.results[site]["snapshots"]))+".png")
+                    jread.draw_tree(tree,"res/img/tree_"+site+str(len(self.results[site]["snapshots"]))+".png")
 
                 # Print Deets 
                 if should_print:
