@@ -17,8 +17,8 @@ class ZBrowse:
     proc      = None
     port      = 9222
     timeout   = 30
-    stdo_name = "zbrowse_sout.snp"
-    stde_name = "zbrowse_serr.snp"
+    stdo_name = "tmp/zbrowse_sout.snp"
+    stde_name = "tmp/zbrowse_serr.snp"
     _stdo     = None
     _stde     = None
     _err_regx = None
@@ -27,7 +27,7 @@ class ZBrowse:
 
     def __init__(self, path, port, chromium_path, stdo_name, stde_name, chrometrace_name):
         self.path  = path
-        self._chromium = Chromium(chromium_path, port, "chromium_out.snp", "chromium_err.snp", 0)
+        self._chromium = Chromium(chromium_path, port, "tmp/chromium_out.snp", "tmp/chromium_err.snp", 0)
         if port != None:
             self.port = port
         if stdo_name != None:
@@ -46,6 +46,7 @@ class ZBrowse:
 
     def run(self, url, timeout):
         self._chromium.start()
+        tree = {}
 
         self._stdo = open(self.stdo_name, "w")
         self._stde = open(self.stde_name, "w")
@@ -64,18 +65,17 @@ class ZBrowse:
             with open(self.stde_name, "r") as stderr_fi:
                 stderr_msg = self._err_regx.search(stderr_fi.read())
             # If there was an out of memory error
-            if stderr_msg != None:
-                # Set the tree to empty
-                tree = {}
-            # Otherwise if the run was succesful
-            else:
+            if stderr_msg == None:
                 # Reopen it 
                 # TODO: Find a better way to do this
                 # than closing & reopening a file
                 with open(self.stdo_name, "r") as stdout_fi:
                     # Read it
                     s = stdout_fi.read()
-                    tree = json.loads(s)
+                    try:
+                        tree = json.loads(s)
+                    except json.decoder.JSONDecodeError:
+                        tree = {}
             # Remove it
             os.system("rm -f "+self.stdo_name)
             os.system("rm -f "+self.stde_name)
@@ -94,24 +94,29 @@ class ZBrowse:
             os.system("rm -f "+self.stdo_name)
             os.system("rm -f "+self.stde_name)
 
-        while not os.path.exists("chrometrace.log"):
-            continue
-        try:
-            with open("chrometrace.log", "r") as fi:
-                curr = json.loads(fi.read())
-            if not os.path.exists(self._ctrace):
-                with open(self._ctrace, "w") as fi:
-                    json.dump({"traceEvents":[]}, fi)
-            with open(self._ctrace, "r") as fi:
-                prev = json.loads(fi.read())
-                prev["traceEvents"] = prev["traceEvents"] + curr["traceEvents"]
-            with open(self._ctrace, "w") as fi:
-                json.dump(prev, fi)
-        except json.JSONDecodeError:
-            os.system("rm -f chrometrace.log")
+        # wait for chrome to save the trace
+        if not os.path.exists("chrometrace.log"):
             return tree
-        os.system("rm -f chrometrace.log")
 
+        # try to decode it
+        with open("chrometrace.log", "r") as fi:
+            try:
+                traces = json.loads(fi.read())
+            except json.JSONDecodeError:
+                traces = {"traceEvents": []}
+
+        # if the trace doesn't exist, then create it
+        if not os.path.exists(self._ctrace):
+            with open(self._ctrace, "w") as fi:
+                json.dump(traces, fi)
+
+        else:
+            with open(self._ctrace, "r") as fi:
+                traces["traceEvents"] += json.loads(fi.read())["traceEvents"]
+            with open(self._ctrace, "w") as fi:
+                json.dump(traces, fi)
+
+        os.system("rm -f chrometrace.log")
         return tree
 
     def stop(self):

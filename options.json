@@ -1,5 +1,7 @@
 {
-	"outfile"      : "res/crawl.json", 
+	"outdir"       : "res/",
+	"outfile"      : "crawl.json", 
+	"imgdir"       : "res/img/",
 	"restore"      : "res/crawl.json", 
 	"sitesfile"    : "sites.json",
 	"zbrowse_path" : "../zbrowse2/js/index.js",

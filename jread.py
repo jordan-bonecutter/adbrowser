@@ -20,7 +20,7 @@ _rules       = None
 _rules_file  = "easylist.json"
 _rules_pkl   = "pickles/rules.pkl"
 _vt_attr     = {"apk_file": "vt.key", "req_url": "https://www.virustotal.com/vtapi/v2/url/report"}
-node_version= "backreferenced-1.2"
+node_version = "fulltree_backreferenced1.2, trimtree-backreferenced1.0"
 
 def csv_2_zbrowse(fname):
     # start with an empty string
@@ -106,6 +106,16 @@ def draw_tree(tree, outname):
             curr.update({key:j})
             j += 1
         i += 1
+    typecolors = {"": (150, 150, 150), "Other": (150, 150, 150), "unknown": (150, 150, 150)}
+    typecolors.update({"Image": (230, 230, 20)})
+    typecolors.update({"Stylesheet": (20, 230, 100)})
+    typecolors.update({"Script": (255, 20, 20)})
+    typecolors.update({"EventSource": (20, 230, 100)})
+    typecolors.update({"Font": (20, 230, 100)})
+    typecolors.update({"Media": (255, 20, 20)})
+    typecolors.update({"Fetch": (230, 230, 20)})
+    typecolors.update({"Document": (230, 230, 20)})
+    typecolors.update({"XHR": (230, 230, 20)})
 
     # get the height and max width
     # of the tree
@@ -127,25 +137,50 @@ def draw_tree(tree, outname):
     while True:
         try:
             # get the image size
-            size = (int(bufx + w*(bufx+(2*rad))), int(bufy + h*(bufy+(2*rad))))
+            size = (bufx + w*(bufx+(2*rad)), bufy + h*(bufy+(2*rad)))
             surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, size[0], size[1])
             break
         except cairo.Error:
-            rad   /= 2
-            bufx  /= 2
-            bufy  /= 2
-            thck  /= 2
-            tsize /= 2
-            tbuf  /= 2
+            rad   = int(rad/2)
+            bufx  = int(bufx/2)
+            bufy  = int(bufy/2)
+            thck  = int(thck/2)
+            tsize = int(tsize/2)
+            tbuf  = int(tbuf/2)
 
     ctx     = cairo.Context(surface)
     ctx.set_source_rgb(1, 1, 1)
     ctx.rectangle(0,0,size[0], size[1])
     ctx.fill()
+
+    fnt = cairo.ToyFontFace("Menlo", cairo.FontSlant.NORMAL, cairo.FontWeight.NORMAL)
+    opt = cairo.FontOptions()
+    fnt = cairo.ScaledFont(fnt, cairo.Matrix(size[0]/60,0,0,size[0]/60,0,0),cairo.Matrix(1,0,0,1,0,0), opt)
+    ctx.set_scaled_font(fnt)
+    nnt = str(num_nodes(tree))
+    net = str(num_ad_nodes(tree, True))
+    nit = str(num_ad_nodes(tree, False))
+    inf = str(nnt+","+net+","+nit)
+    ext = fnt.text_extents(inf)
+    ctx.move_to(0, ext.height)
+
+    ctx.set_source_rgb(50/255,20/255,255/255)
+    ctx.show_text(nnt)
+    ctx.set_source_rgb(0,0,0)
+    ctx.show_text(",")
+    ctx.set_source_rgb(255/255,20/255,50/255)
+    ctx.show_text(net)
+    ctx.set_source_rgb(0,0,0)
+    ctx.show_text(",")
+    ctx.set_source_rgb(255/255,20/255,200/255)
+    ctx.show_text(nit)
+    ctx.stroke()
+
     fnt = cairo.ToyFontFace("Menlo", cairo.FontSlant.NORMAL, cairo.FontWeight.NORMAL)
     opt = cairo.FontOptions()
     fnt = cairo.ScaledFont(fnt, cairo.Matrix(tsize, 0, 0, tsize, 0, 0), cairo.Matrix(1, 0, 0, 1, 0, 0), opt)
     ctx.set_scaled_font(fnt)
+
     ctx.set_line_cap (cairo.LineCap.BUTT)
     ctx.set_line_join(cairo.LineJoin.ROUND)
     ctx.set_line_width(thck)
@@ -193,22 +228,48 @@ def draw_tree(tree, outname):
             # need only update the x position
             cx  = c0x + structure[level][item]*(2*rad + bufx)
             
-            # draw ecntered text
-            vttxt    = str(tree[level][item]["vt"])
+            # draw centered text
+            try:
+                sqtxt = str(tree[level][item]["squish"])
+            except KeyError:
+                sqtxt = ""
 
             # draw the circle + text
             ctx.set_source_rgb(color[0], color[1], color[2])
             ctx.arc(cx, cy, rad, 0, 2*math.pi)
             ctx.fill()
+
+            if "types" in tree[level][item]:
+                ntypes = len(tree[level][item]["types"])
+                for idt, t in enumerate(tree[level][item]["types"]):
+                    try:
+                        color = typecolors[t]
+                    except KeyError:
+                        print(t)
+                        color = typecolors[""]
+                    ctx.set_source_rgb(color[0]/255, color[1]/255, color[2]/255)
+                    ctx.arc(cx, cy, rad, idt*2*math.pi/ntypes, (idt+1)*2*math.pi/ntypes)
+                    ctx.stroke()
+
+            elif "type" in tree[level][item]:
+                try:
+                    color = typecolors[tree[level][item]["type"]]
+                except:
+                    print(tree[level][item]["type"])
+                    color = typecolors[""]
+                ctx.set_source_rgb(color[0]/255, color[1]/255, color[2]/255)
+                ctx.arc(cx, cy, rad, 0, 2*math.pi)
+                ctx.stroke()
+
             ctx.set_source_rgba(0, 0, 0, 1.0)
 
             ext = fnt.text_extents(get_url(item))
             ctx.move_to(cx-ext.width/2, cy-tbuf)
             ctx.show_text(get_url(item))
 
-            ext = fnt.text_extents(vttxt)
+            ext = fnt.text_extents(sqtxt)
             ctx.move_to(cx-ext.width/2, cy+ext.height + tbuf)
-            ctx.show_text(vttxt)
+            ctx.show_text(sqtxt)
             ctx.stroke()
             
             # if we aren't at the top level then
@@ -227,10 +288,10 @@ def draw_tree(tree, outname):
                     # get the width of the parent layer
                     plsize = len(puni)
                     # calculate on offset so that lines dont intersect
-                    offy = (puni[parent]+2)*bufy/(plsize+3)
-                    ofrx = (thck*(thisptot-1)) + (2*thck*(thisptot-1)) 
-                    of0x = -ofrx/2
-                    offx = of0x + thisp*ofrx/thisptot
+                    offy = int((puni[parent]+2)*bufy/(plsize+3))
+                    ofrx = int((thck*(thisptot-1)) + (2*thck*(thisptot-1)))
+                    of0x = int(-ofrx/2)
+                    offx = int(of0x + thisp*ofrx/thisptot)
                     # draw 3 lines to connect the parent and child
                     ctx.move_to(cx+offx, cy-rad)
                     ctx.line_to(cx+offx, cy-rad-offy)
@@ -249,8 +310,46 @@ def draw_tree(tree, outname):
     # save the image
     surface.write_to_png(outname)
 
+def traverse_tree(base, root, tree, nodes):
+    global _rules
+    pid = root["parent"]
+    cid = root["data"]
+    if get_url(pid) == "nil" or get_url(cid) == "nil":
+        return
+
+    # try to find the parent
+    try:
+        par_l = nodes[pid]
+    except KeyError:
+        tree[0].update({pid: {"parents": {None:0}, "ad": "no", "vt": 0, "type": "", "frameId": 0}})
+        if _rules.should_block(pid):
+            tree[0][pid]["ad"] = "yes"
+        nodes.update({pid: 0})
+        par_l = 0
+
+    if len(tree) == par_l+1:
+        tree.append({})
+
+    # try to find the child
+    try:
+        child_node = tree[par_l+1][cid]
+        child_node["parents"].update({pid: 1})
+    except KeyError:
+        tree[par_l+1].update({cid: {"parents": {pid: 1}, "ad": "no", "vt": 0, "type": "", "frameId": 0}})
+        if _rules.should_block(cid):
+            tree[par_l+1][cid]["ad"] = "yes"
+        try: 
+            tree[par_l+1][cid]["type"]    = root["networkData"]["request"]["type"]
+            tree[par_l+1][cid]["frameId"] = root["networkData"]["request"]["frameId"]
+        except KeyError:
+            tree[par_l+1][cid]["type"] = "unknown"
+            tree[par_l+1][cid]["frameId"] = -1
+        nodes.update({cid: par_l+1})
+
+    for child in root["children"]:
+        traverse_tree(base, child, tree, nodes)
+
 def get_tree(root):
-    # save a regex for parsing the tree
     global _rules
     if _rules == None:
         if os.path.exists(_rules_pkl):
@@ -258,100 +357,76 @@ def get_tree(root):
                 _rules = pickle.load(fi)
         else:
             with open(_rules_file, "r") as fi:
-                _rules = AdblockRules(json.loads(fi.read()))
+                _rules = json.loads(fi.read())
             with open(_rules_pkl, "wb") as fi:
                 pickle.dump(_rules, fi, -1)
 
-    # init an empty tree
-    tree    = [{}]
-    nodes   = {}
+    tree  = [{}]
+    nodes = {}
+    for child in root["_root"]["children"]:
+        traverse_tree(root["_root"], child, tree, nodes)
 
-    tree_traverse(tree, nodes, root["_root"])
-
-    for l in range(1, len(tree)):
-        for n in tree[l].keys():
-            if tree[l][n]["ad"] == "yes":
+    for idl, layer in enumerate(tree[1:]):
+        for url, node in layer.items():
+            if node["ad"] == "yes":
                 continue
-            for p in tree[l][n]["parents"].keys():
-                if tree[l-1][p]["ad"] != "no":
-                    tree[l][n]["ad"] = "inherited"
+            for parent in node["parents"].keys():
+                if tree[idl][parent]["ad"] != "no":
+                    node["ad"] = "inherited"
                     break
 
-    return tree
-
-def tree_traverse(tree, nodes, root):
-    c_url = root["data"]
-    p_url = root["parent"]
-    try:
-        r_url = root["networkData"]["request"]["request"]["headers"]["Referer"]
-        add_branch(tree, nodes, p_url, r_url)
-        add_branch(tree, nodes, r_url, c_url)
-    except KeyError:
-        add_branch(tree, nodes, p_url, c_url)
-
-    if "children" in root:
-        for child in root["children"]:
-            tree_traverse(tree, nodes, child)
-
-def add_branch(tree, nodes, parent, child):
-    global _rules
-
-    c_url = get_url(child)
-    p_url = get_url(parent)
-    if p_url == "nil" or c_url == "nil":
-        return
-
-    # search for parent
-    #
-    # if the parent is not in the tree
-    if not parent in nodes:
-        layer = 0
-        tree[0].update({parent: {"ad": "no", "vt": 0, "parents": {}}})
-        nodes.update({parent: 0})
-        if _rules.should_block(parent):
-            tree[0][parent]["ad"] = "yes"
-    # if the parent is in the tree
-    else:
-        layer = nodes[parent]
-
-    # make sure the tree is big enough
-    if len(tree) == layer+1:
-        tree.append({})
-
-    # if the child is already in the tree
-    if child in tree[layer+1]:
-        if not parent in tree[layer+1][child]["parents"]:
-            tree[layer+1][child]["parents"].update({parent: 1})
-        else:
-            tree[layer+1][child]["parents"][parent] += 1
-
-    # if the child is not yet in the tree
-    else:
-        tree[layer+1].update({child: {"ad": "no", "vt": 0, "parents": {parent: 1}}})
-        nodes.update({child: layer+1})
-        if _rules.should_block(child):
-            tree[layer+1][child]["ad"] = "yes"
+    return {"tree_full": tree, "tree_trimmed": trim_tree(tree)}
 
 def trim_tree(tree):
-    trim  = [{}]
-    nodes = {}
-    names = []
-    index = 0
-    
-    trim[0].update({0: tree[0]})
-    nodes.update({list(tree[0].keys())[0]: index})
-    names.append(list(tree[0].keys())[0])
-    index += 1
-    # go through each level of the tree
-    for lev in tree[1:]:
-        # fo thru each url in that level
-        for url in lev.keys():
-            # if the url is not in the tree
-            if not url in nodes:
-                # then we need to add it
-                return 0
-    return 0
-                 
+    trim = []
+    for idl, level in enumerate(tree):
+        trim.append({})
+        for name, info in level.items():
+            alias = get_url(name)
+            try:
+                trim[idl][alias]["squish"] += 1
+                try:
+                    trim[idl][alias]["types"][info["type"]] += 1
+                except KeyError:
+                    trim[idl][alias]["types"].update({info["type"]: 1})
+                if trim[idl][alias]["ad"] == "no" and info["ad"] != "no":
+                    trim[idl][alias]["ad"] = info["ad"]
+                elif trim[idl][alias]["ad"] != "yes" and info["ad"] == "yes":
+                    trim[idl][alias]["ad"] = "yes"
+            except KeyError:
+                trim[idl].update({alias: {"parents": {}, "ad": "no", "squish": 1, "vt": 0, "types": {}}})
+                try:
+                    trim[idl][alias]["types"][info["type"]] += 1
+                except KeyError:
+                    trim[idl][alias]["types"].update({info["type"]: 1})
+                trim[idl][alias]["ad"] = info["ad"]
+            for parent in info["parents"]:
+                palias = get_url(parent)
+                try:
+                    trim[idl][alias]["parents"][palias] += 1
+                except KeyError:
+                    trim[idl][alias]["parents"].update({palias: 1})
+
+    return trim
+
+def num_ad_nodes(tree, explicit):
+    ret = 0
+    for layer in tree:
+        for url, data in layer.items():
+            if explicit:
+                if data["ad"] == "yes":
+                    ret += 1
+            else:
+                if data["ad"] != "no":
+                    ret += 1
+    return ret
+
+def num_nodes(tree):
+    ret = 0
+    for layer in tree:
+        ret += len(layer)
+
+    return ret
 
 def get_vtscore(url):
     global _vt_attr

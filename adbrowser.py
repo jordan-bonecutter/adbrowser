@@ -14,26 +14,36 @@ import os
 class Adbrowser:
     zb      = None
     sites   = None
-    outfile = "res/crawl.json"
+    outdir  = "res/"
+    outfile = "crawl.json"
+    imgdir  = "res/img/"
     restore = None
     results = None
 
-    def __init__(self, sitesfile, outfile, restore, zbpath, cpath):
+    def __init__(self, sitesfile, outdir, outfile, imgdir, restore, zbpath, cpath):
         with open(sitesfile, "r") as fi:
             self.sites = json.loads(fi.read())
+        self.outdir  = outdir
         self.outfile = outfile
+        self.imgdir  = imgdir
         self.restore = restore
         self.zb      = zbrowse.ZBrowse(zbpath, 52849, cpath, None, None, None) 
 
     @classmethod
     def fromdict(cls, d):
         rs = None
-        of = None
+        od = "res/"
+        of = "crawl.json"
+        im = "res/img/"
+        if "outdir" in d:
+            od = d["outdir"]
         if "outfile" in d:
             of = d["outfile"]
+        if "imgdir" in d:
+            im = "res/img/"
         if "restore" in d:
             rs = d["restore"]
-        return cls(d["sitesfile"], of, rs, d["zbrowse_path"], d["chromium_path"])
+        return cls(d["sitesfile"], od, of, im, rs, d["zbrowse_path"], d["chromium_path"])
 
     @classmethod
     def fromfile(cls, fname):
@@ -96,14 +106,19 @@ class Adbrowser:
                 # failed, continue looping
                 if tree == {}:
                     if should_print:
-                        print("Unknown error...")
+                        print("JS out of memory at " + site)
                     continue
 
                 # Extract the tree
-                tree = jread.get_tree(tree)
-                self.results[site]["snapshots"].append({"date":date,"tree":tree,"format":jread.node_version})
+                trees = jread.get_tree(tree)
+                snap  = {"date": date, "format": jread.node_version}
+                snap.update(trees)
+                self.results[site]["snapshots"].append(snap)
                 if save_image:
-                    jread.draw_tree(tree,"res/img/tree_"+site+str(len(self.results[site]["snapshots"]))+".png")
+                    path  = self.imgdir+"tree_"
+                    trial = len(self.results[site]["snapshots"])
+                    jread.draw_tree(trees["tree_full"],    path+"full_"   +site+str(trial)+".png")
+                    jread.draw_tree(trees["tree_trimmed"], path+"trimmed_"+site+str(trial)+".png")
 
                 # Print Deets 
                 if should_print:
@@ -115,5 +130,5 @@ class Adbrowser:
 
     def save(self):
         if self.results != None:
-            with open(self.outfile, "w") as fi:
+            with open(self.outdir+self.outfile, "w") as fi:
                 json.dump(self.results, fi)
